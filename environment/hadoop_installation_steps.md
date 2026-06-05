@@ -25,6 +25,7 @@
 - Operating system: Windows
 - Architecture: x64
 - Package type: JDK
+
 Nguồn tải: 
 https://www.openlogic.com/openjdk-downloads?field_java_parent_version_target_id=416&field_operating_system_target_id=436&field_architecture_target_id=391&field_java_package_target_id=396
 
@@ -66,6 +67,9 @@ tar -xzf hadoop-*.tar.gz
 ```
 
 <img width="557" height="470" alt="image" src="https://github.com/user-attachments/assets/44721dad-4ffb-49f6-afdc-88a7452c128a" />
+<img width="877" height="966" alt="Untitled design (3)" src="https://github.com/user-attachments/assets/a5acdbbe-0040-4148-81f3-fec80a5ed48c" />
+<img width="1103" height="208" alt="image" src="https://github.com/user-attachments/assets/58be316d-f708-4a19-a2ad-ca4b52be7bf7" />
+
 
 ---
 
