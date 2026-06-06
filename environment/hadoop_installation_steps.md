@@ -37,9 +37,8 @@ D:\BIGDATA_THM\JAVA\openlogic-openjdk-8u492-b09-windows-x64
 Cấu hình biến môi trường JAVA_HOME và bổ sung đường dẫn Java vào biến Path.
 - Tạo biến hệ thống JAVA_HOME
 - Giá trị của JAVA_HOME trỏ đến thư mục cài đặt JDK 8
-- Thêm %JAVA_HOME%\bin vào biến Path
-- Mở lại Command Prompt/PowerShell để kiểm tra cấu hình
 <img width="877" height="966" alt="Untitled design (1)" src="https://github.com/user-attachments/assets/a605079a-de21-4a5d-a80e-6a1fb89d4313" />
+- Thêm %JAVA_HOME%\bin vào biến Path
 <img width="877" height="966" alt="Untitled design (2)" src="https://github.com/user-attachments/assets/f3641dc3-df94-4a0d-bd9b-50ea4e6e3692" />
 
 ### Kiểm tra Java
@@ -55,9 +54,12 @@ java -version
 ## 4. Cài đặt Hadoop
 
 ### Tải Hadoop
-
-Nguồn tải:
-
+Nhóm sử dụng Apache Hadoop phiên bản 3.4.1 để triển khai mô hình Hadoop Single Node trên hệ điều hành Windows.
+- Hadoop version: 3.4.1
+- Package: Binary package
+- File tải về: `hadoop-3.4.1.tar.gz`
+- Nguồn tải:
+  
 * URL: https://www.apache.org/dyn/closer.cgi/hadoop/common/hadoop-3.4.1/hadoop-3.4.1-src.tar.gz
 
 ### Giải nén Hadoop
@@ -67,45 +69,94 @@ tar -xzf hadoop-*.tar.gz
 ```
 
 <img width="557" height="470" alt="image" src="https://github.com/user-attachments/assets/44721dad-4ffb-49f6-afdc-88a7452c128a" />
-<img width="877" height="966" alt="Untitled design (3)" src="https://github.com/user-attachments/assets/a5acdbbe-0040-4148-81f3-fec80a5ed48c" />
-<img width="1103" height="208" alt="image" src="https://github.com/user-attachments/assets/58be316d-f708-4a19-a2ad-ca4b52be7bf7" />
 
+### Cấu hình biến môi trường 
+<img width="877" height="966" alt="Untitled design (3)" src="https://github.com/user-attachments/assets/a5acdbbe-0040-4148-81f3-fec80a5ed48c" />
+
+### Kiểm tra lại Command Prompt/PowerShell mới và chạy lệnh:
+```bash
+hadoop version
+```
+<img width="1103" height="208" alt="image" src="https://github.com/user-attachments/assets/58be316d-f708-4a19-a2ad-ca4b52be7bf7" />
 
 ---
 
 ## 5. Cấu hình Hadoop
 
 ### File core-site.xml
-
-Giải thích ngắn chức năng.
-
+File core-site.xml được sử dụng để cấu hình địa chỉ mặc định của hệ thống tệp phân tán HDFS. Trong cấu hình này, thuộc tính fs.defaultFS được thiết lập là hdfs://localhost:9000, cho biết Hadoop sẽ kết nối đến NameNode chạy trên máy local tại cổng 9000.
+```bash
+<configuration>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://localhost:9000</value>
+    </property>
+</configuration>
+```
 Screenshot:
-
-* [ ] core-site.xml
+<img width="910" height="435" alt="image" src="https://github.com/user-attachments/assets/619c7304-5ef2-4c1b-b1c7-837511a7a6fd" />
 
 ### File hdfs-site.xml
+File hdfs-site.xml được sử dụng để cấu hình các thông số liên quan đến HDFS. Do hệ thống được triển khai theo mô hình Single Node, số lượng bản sao dữ liệu được thiết lập là 1 thông qua thuộc tính dfs.replication.
 
-Giải thích ngắn chức năng.
+Ngoài ra, file này cũng khai báo thư mục lưu trữ metadata của NameNode và dữ liệu block của DataNode. Trước khi cấu hình, tạo hai thư mục lưu trữ dữ liệu cho HDFS là datanode và namenode:
+<img width="555" height="223" alt="image" src="https://github.com/user-attachments/assets/455ac189-5fb7-4de1-a96c-48b455243675" />
 
+Nội dung cấu hình: 
+```bash
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>1</value>
+    </property>
+
+    <property>
+        <name>dfs.namenode.name.dir</name>
+        <value>file:///D:/BIGDATA_THM/HADOOP/hadoop-3.4.1/data/namenode</value>
+    </property>
+
+    <property>
+        <name>dfs.datanode.data.dir</name>
+        <value>file:///D:/BIGDATA_THM/HADOOP/hadoop-3.4.1/data/datanode</value>
+    </property>
+</configuration>
+```
 Screenshot:
 
-* [ ] hdfs-site.xml
+<img width="1189" height="611" alt="image" src="https://github.com/user-attachments/assets/134d5727-b70e-40a8-9123-a8acbc99fd82" />
 
 ### File mapred-site.xml
-
-Giải thích ngắn chức năng.
-
+File mapred-site.xml được sử dụng để cấu hình framework thực thi MapReduce. Trong cấu hình này, thuộc tính mapreduce.framework.name được thiết lập là yarn, cho phép các tác vụ MapReduce được thực thi thông qua YARN.
+```bash
+<configuration>
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+    </property>
+</configuration>
+```
 Screenshot:
 
-* [ ] mapred-site.xml
+<img width="1011" height="421" alt="image" src="https://github.com/user-attachments/assets/63b4669f-8953-4a3b-8097-c109ed90cbe8" />
 
 ### File yarn-site.xml
 
-Giải thích ngắn chức năng.
+File yarn-site.xml được sử dụng để cấu hình YARN. Trong cấu hình này, dịch vụ mapreduce_shuffle được khai báo để NodeManager có thể hỗ trợ quá trình thực thi các tác vụ MapReduce trên YARN.
+```bash
+<configuration>
+    <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+    </property>
 
+    <property>
+        <name>yarn.nodemanager.aux-services.mapreduce.shuffle.class</name>
+        <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+    </property>
+</configuration>
+```
 Screenshot:
-
-* [ ] yarn-site.xml
+<img width="1190" height="613" alt="image" src="https://github.com/user-attachments/assets/c65b9044-471e-467f-a397-30dfc81a4cec" />
 
 ---
 
