@@ -203,43 +203,7 @@ Kết quả mong đợi bao gồm các tiến trình như:
 
 ---
 
-## 9. Kiểm tra HDFS
-
-### 9.1. Tạo thư mục
-Tạo thư mục lưu trữ dữ liệu Prosper Loan Dataset trên HDFS:
-```bash
-hdfs dfs -mkdir -p /bigdata/prosper_loan/raw
-```
-
-### 9.2. Kiểm tra cấu trúc thư mục HDFS
-Chạy lệnh sau để kiểm tra thư mục đã được tạo:
-```bash
-hdfs dfs -ls /
-```
-
-<img width="1426" height="472" alt="image" src="https://github.com/user-attachments/assets/44a7f8be-6a37-4a00-8e3a-03dd45f50db0" />
-
----
-
-## 10. Upload Dataset lên HDFS
-
-### 10.1.Upload file
-Upload file Prosper Loan Dataset từ máy local lên HDFS:
-```bash
-hdfs dfs -put prosperLoanData.csv /bigdata/prosper_loan/raw/
-```
-
-### 10.2. Kiểm tra file
-Chạy lệnh sau để kiểm tra file dữ liệu đã được upload thành công:
-```bash
-hdfs dfs -ls /bigdata/prosper_loan/raw/
-```
-
-<img width="1430" height="531" alt="image" src="https://github.com/user-attachments/assets/ad692302-8816-450b-aae6-31ee5daf83a9" />
-
----
-
-## 11. Kết quả đạt được
+## 9. Kết quả đạt được
 Sau khi hoàn thành các bước cài đặt và cấu hình, môi trường Hadoop Single Node đã được thiết lập thành công trên Windows. Các kết quả đạt được gồm:
 
 - Java được cài đặt và cấu hình thành công.
@@ -247,6 +211,3 @@ Sau khi hoàn thành các bước cài đặt và cấu hình, môi trường Ha
 - Các file cấu hình Hadoop được thiết lập cho mô hình Single Node.
 - HDFS được khởi tạo thành công.
 - Các dịch vụ Hadoop được khởi động và kiểm tra bằng lệnh jps.
-- Thư mục lưu trữ dữ liệu được tạo trên HDFS.
-- Prosper Loan Dataset được upload thành công lên HDFS.
-- Môi trường đã sẵn sàng cho bước xử lý dữ liệu bằng Apache Spark.
