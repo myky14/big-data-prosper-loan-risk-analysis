@@ -5,153 +5,42 @@
 Ghi lại các lệnh HDFS đã sử dụng trong quá trình lưu trữ và quản lý Prosper Loan Dataset trên Hadoop Distributed File System (HDFS).
 
 ---
-
-# 1. Kiểm tra HDFS
-
-### Kiểm tra thư mục gốc
-
-```bash
-hdfs dfs -ls /
-```
-
-Kết quả:
-
-* Mô tả ngắn kết quả trả về.
-
-📸 Screenshot:
-
-* [ ] Terminal hiển thị danh sách thư mục HDFS
-
----
-
-# 2. Tạo thư mục dự án
-
-### Tạo thư mục chính
-
+## 1. Kiểm tra HDFS
+### 1.1. Tạo thư mục
+Tạo thư mục lưu trữ dữ liệu Prosper Loan Dataset trên HDFS:
 ```bash
 hdfs dfs -mkdir -p /bigdata/prosper_loan/raw
 ```
 
-### Kiểm tra thư mục
-
+### 1.2. Kiểm tra cấu trúc thư mục HDFS
+Chạy lệnh sau để kiểm tra thư mục đã được tạo:
 ```bash
-hdfs dfs -ls /bigdata/prosper_loan
+hdfs dfs -ls /
 ```
 
-Kết quả:
-
-* Thư mục raw được tạo thành công.
-
-📸 Screenshot:
-
-* [ ] Terminal hiển thị thư mục prosper_loan
+<img width="1426" height="472" alt="image" src="https://github.com/user-attachments/assets/44a7f8be-6a37-4a00-8e3a-03dd45f50db0" />
 
 ---
 
-# 3. Upload Dataset lên HDFS
+## 2. Upload Dataset lên HDFS
 
-### Upload file CSV
-
+### 2.1.Upload file
+Upload file Prosper Loan Dataset từ máy local lên HDFS:
 ```bash
 hdfs dfs -put prosperLoanData.csv /bigdata/prosper_loan/raw/
 ```
 
-### Kiểm tra file
-
+### 2.2. Kiểm tra file
+Chạy lệnh sau để kiểm tra file dữ liệu đã được upload thành công:
 ```bash
 hdfs dfs -ls /bigdata/prosper_loan/raw/
 ```
 
-Kết quả:
-
-* Dataset được lưu thành công trên HDFS.
-
-📸 Screenshot:
-
-* [ ] Terminal hiển thị file prosperLoanData.csv trong HDFS
+<img width="1430" height="531" alt="image" src="https://github.com/user-attachments/assets/ad692302-8816-450b-aae6-31ee5daf83a9" />
 
 ---
 
-# 4. Kiểm tra nội dung Dataset
-
-### Xem vài dòng đầu
-
-```bash
-hdfs dfs -cat /bigdata/prosper_loan/raw/prosperLoanData.csv | head
-```
-
-Kết quả:
-
-* Hiển thị dữ liệu đầu vào.
-
-📸 Screenshot:
-
-* [ ] Terminal hiển thị dữ liệu mẫu
-
----
-
-# 5. Kiểm tra dung lượng Dataset
-
-### Xem kích thước file
-
-```bash
-hdfs dfs -du -h /bigdata/prosper_loan/raw/
-```
-
-Kết quả:
-
-* Hiển thị dung lượng dataset.
-
-📸 Screenshot:
-
-* [ ] Terminal hiển thị kích thước file
-
----
-
-# 6. Kiểm tra thông tin file
-
-### Xem chi tiết file
-
-```bash
-hdfs dfs -stat "%n %b bytes" /bigdata/prosper_loan/raw/prosperLoanData.csv
-```
-
-Kết quả:
-
-* Hiển thị tên và dung lượng file.
-
-📸 Screenshot:
-
-* [ ] Terminal hiển thị thông tin file
-
----
-
-# 7. Kiểm tra trên NameNode UI
-
-### Truy cập NameNode
-
-URL:
-
-http://localhost:9870
-
-### Kiểm tra thư mục
-
-* /bigdata
-* /prosper_loan
-* /raw
-
-Kết quả:
-
-* Dataset xuất hiện trên giao diện HDFS.
-
-📸 Screenshot:
-
-* [ ] NameNode UI
-* [ ] Dataset trong HDFS
-
----
-
-# 8. Các lệnh sử dụng trong quá trình thực hiện
+# 3. Các lệnh sử dụng trong quá trình thực hiện
 
 | Lệnh            | Mục đích             |
 | --------------- | -------------------- |
