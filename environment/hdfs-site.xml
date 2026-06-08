@@ -1,0 +1,16 @@
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>1</value>
+    </property>
+
+    <property>
+        <name>dfs.namenode.name.dir</name>
+        <value>file:///D:/BIGDATA_THM/HADOOP/hadoop-3.4.1/data/namenode</value>
+    </property>
+
+    <property>
+        <name>dfs.datanode.data.dir</name>
+        <value>file:///D:/BIGDATA_THM/HADOOP/hadoop-3.4.1/data/datanode</value>
+    </property>
+</configuration>
