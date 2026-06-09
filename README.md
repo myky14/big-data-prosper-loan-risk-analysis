@@ -210,7 +210,7 @@ Prosper-Loan-Risk-Analysis/
 ### Clone Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/myky14/big-data-prosper-loan-risk-analysis
 
 cd Prosper-Loan-Risk-Analysis
 ```
@@ -218,6 +218,7 @@ cd Prosper-Loan-Risk-Analysis
 ### Start Hadoop
 ```bash
 start-dfs.cmd
+start-yarn.cmd
 ```
 
 ### Verify HDFS:
@@ -227,14 +228,14 @@ hdfs dfs -ls /
 
 ### Run Spark Scripts
 ```bash
-spark-submit Scripts/00_check_dataset.py
-spark-submit Scripts/02_read_from_hdfs.py
-spark-submit Scripts/03_domain_feature_reduction.py
-spark-submit Scripts/04_eda.py
-spark-submit Scripts/05_ml_preprocessing.py
-spark-submit Scripts/06_feature_selection.py
-spark-submit Scripts/07_spark_sql_analysis.py
-spark-submit Scripts/08_spark_ml_regression.py
+spark-submit src/00_check_dataset.py
+spark-submit src/02_read_from_hdfs.py
+spark-submit src/03_feature_analysis.py
+spark-submit src/04_eda.py
+spark-submit src/05_ml_preprocessing.py
+spark-submit src/06_feature_selection.py
+spark-submit src/07_spark_sql_analysis.py
+spark-submit src/08_spark_ml_regression.py
 ```
 ---
 
