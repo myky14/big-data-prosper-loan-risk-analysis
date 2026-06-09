@@ -180,6 +180,7 @@ Metrics:
 * Pandas
 * Matplotlib
 * Seaborn
+* VS Code
 
 ---
 
@@ -188,38 +189,53 @@ Metrics:
 ```text
 Prosper-Loan-Risk-Analysis/
 │
-├── Data/
-├── Notebooks/
-├── Spark_SQL/
-├── Feature_Selection/
-├── Machine_Learning/
-├── Visualizations/
+├── data/
+├── environments/
+├── src/
 ├── Screenshots/
-├── Reports/
 └── README.md
 ```
 
 ---
 
-## Setup
+## Setup & Usage
 
 ### Prerequisites
 
-* Python 3.x
-* Apache Hadoop
-* Apache Spark
-* Jupyter Notebook
+- Python 3.x
+- Apache Hadoop
+- Apache Spark
+- Java JDK
 
-### Run Project
+### Clone Repository
 
 ```bash
 git clone <repository-url>
 
 cd Prosper-Loan-Risk-Analysis
-
-jupyter notebook
 ```
 
+### Start Hadoop
+```bash
+start-dfs.cmd
+```
+
+### Verify HDFS:
+```bash
+hdfs dfs -ls /
+```
+
+### Run Spark Scripts
+```bash
+spark-submit Scripts/00_check_dataset.py
+spark-submit Scripts/02_read_from_hdfs.py
+spark-submit Scripts/03_domain_feature_reduction.py
+spark-submit Scripts/04_eda.py
+spark-submit Scripts/05_ml_preprocessing.py
+spark-submit Scripts/06_feature_selection.py
+spark-submit Scripts/07_spark_sql_analysis.py
+spark-submit Scripts/08_spark_ml_regression.py
+```
 ---
 
 ## Status
