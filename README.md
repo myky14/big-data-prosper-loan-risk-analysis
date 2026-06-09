@@ -240,17 +240,9 @@ spark-submit Scripts/08_spark_ml_regression.py
 
 ## Status
 
-Project Status:
+🚧 Project Status: In Progress
 
-Completed Academic Project
-
-Course:
-
-Big Data
-
-Version:
-
-v1.0
+The project is currently under development as part of the Big Data course. Feature selection has been completed, while business insight generation, machine learning modeling, and final documentation are still in progress.
 
 ---
 
