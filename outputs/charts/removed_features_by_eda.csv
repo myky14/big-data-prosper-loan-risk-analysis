@@ -1,0 +1,5 @@
+RemovedFeature,RemovalStage,Reason
+TotalProsperLoans,Distribution/Missing Value Analysis,Missing value percentage above 80%.
+ProsperPaymentsLessThanOneMonthLate,Distribution/Missing Value Analysis,Missing value percentage above 80%.
+ProsperPaymentsOneMonthPlusLate,Distribution/Missing Value Analysis,Missing value percentage above 80%.
+Investors,Manual Leakage or Proxy Removal,Manual removal: platform funding participation signal with limited borrower credit-risk business value for the EDA-reduced feature set.
