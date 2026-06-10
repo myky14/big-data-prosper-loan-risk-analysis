@@ -1,7 +1,4 @@
 column,missing_count,missing_percent
-TotalProsperLoans,91852,80.62
-ProsperPaymentsLessThanOneMonthLate,91852,80.62
-ProsperPaymentsOneMonthPlusLate,91852,80.62
 EstimatedLoss,29084,25.53
 ProsperScore,29084,25.53
 DebtToIncomeRatio,8554,7.51
@@ -21,4 +18,3 @@ DateCreditPulled,0,0.0
 IncomeRange,0,0.0
 LoanOriginalAmount,0,0.0
 LoanOriginationDate,0,0.0
-Investors,0,0.0
