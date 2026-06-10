@@ -12,6 +12,8 @@ spark = (
 
 spark.sparkContext.setLogLevel("ERROR")
 
+feature_progress = []
+
 
 def print_status(step_name, dataframe):
     print(f"\n========== {step_name} ==========")
@@ -19,17 +21,75 @@ def print_status(step_name, dataframe):
     print(f"Columns: {len(dataframe.columns)}")
 
 
+def print_feature_list(title, columns):
+    print(f"{title} ({len(columns)}):")
+    if not columns:
+        print("- None")
+        return
+
+    for column_name in columns:
+        print(f"- {column_name}")
+
+
+def record_feature_progress(step_name, dataframe):
+    feature_progress.append((step_name, len(dataframe.columns)))
+
+
+def print_initial_domain_filtering_summary(columns_before, columns_removed, columns_remaining):
+    print("\n========== INITIAL DOMAIN FILTERING SUMMARY ==========")
+    print(f"Columns before filtering: {columns_before}")
+    print(f"Columns removed: {columns_removed}")
+    print(f"Columns remaining: {columns_remaining}")
+
+    print("\nRemoved column categories:")
+    print("- Identifier columns")
+    print("- Duplicate loan identifiers")
+    print("- Internal platform tracking fields")
+    print("- Historical payment/recovery accounting fields")
+    print("- Post-loan outcome leakage variables")
+
+    print("\nReason:")
+    print(
+        "These columns are not suitable as predictive features because they either "
+        "uniquely identify records, contain duplicated identifiers, represent internal "
+        "platform bookkeeping fields, or leak information that would not be available "
+        "at loan origination time."
+    )
+
+    print("\nConclusion:")
+    print(
+        f"Initial domain filtering reduced the dataset from {columns_before} to "
+        f"{columns_remaining} features."
+    )
+    print(
+        "The removed attributes do not contribute meaningful predictive information "
+        "for loan risk modeling and may introduce noise or data leakage."
+    )
+    print(
+        "The remaining features will be evaluated further through domain-based grouping "
+        "and feature analysis."
+    )
+
+
+def print_feature_reduction_progress():
+    print("\n========== FEATURE REDUCTION PROGRESS ==========")
+    print(f"{'Step':<45} Columns")
+    print("-" * 55)
+    for step_name, column_count in feature_progress:
+        print(f"{step_name:<45} {column_count}")
+
+
 def safe_drop(dataframe, columns_to_drop):
     existing_columns = [col_name for col_name in columns_to_drop if col_name in dataframe.columns]
     missing_columns = [col_name for col_name in columns_to_drop if col_name not in dataframe.columns]
 
     if missing_columns:
-        print("Missing columns skipped:", missing_columns)
+        print_feature_list("Missing columns skipped", missing_columns)
 
     if not existing_columns:
         return dataframe
 
-    print("Dropped columns:", existing_columns)
+    print_feature_list("Dropped columns", existing_columns)
     return dataframe.drop(*existing_columns)
 
 
@@ -42,6 +102,7 @@ df = spark.read.csv(
 )
 
 print_status("RAW DATASET", df)
+record_feature_progress("Raw Dataset", df)
 
 df_reduced = df
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
@@ -71,9 +132,16 @@ cols_group_0 = [
     "ClosedDate"
 ]
 
+group_0_columns_before = len(df_reduced.columns)
 df_reduced = safe_drop(df_reduced, cols_group_0)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 0 - AFTER INITIAL DOMAIN FILTERING", df_reduced)
+record_feature_progress("Initial Domain Filtering", df_reduced)
+print_initial_domain_filtering_summary(
+    group_0_columns_before,
+    group_0_columns_before - len(df_reduced.columns),
+    len(df_reduced.columns)
+)
 
 
 # GROUP 1: Internal Risk Metrics
@@ -111,6 +179,7 @@ cols_group_1 = [
 df_reduced = safe_drop(df_reduced, cols_group_1)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 1 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 1 - Internal Risk Metrics", df_reduced)
 
 
 # GROUP 2: Income and Employment
@@ -151,6 +220,7 @@ cols_group_2 = [
 df_reduced = safe_drop(df_reduced, cols_group_2)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 2 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 2 - Income and Employment", df_reduced)
 
 
 # GROUP 3: Credit History
@@ -211,6 +281,7 @@ cols_group_3 = [
 df_reduced = safe_drop(df_reduced, cols_group_3)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 3 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 3 - Credit History", df_reduced)
 
 
 # GROUP 4: Debt and Credit Utilization
@@ -257,6 +328,7 @@ cols_group_4 = [
 df_reduced = safe_drop(df_reduced, cols_group_4)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 4 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 4 - Debt and Credit Utilization", df_reduced)
 
 
 # GROUP 5: Delinquency and Public Records
@@ -293,6 +365,7 @@ cols_group_5 = [
 df_reduced = safe_drop(df_reduced, cols_group_5)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 5 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 5 - Delinquency and Public Records", df_reduced)
 
 
 # GROUP 6: Previous Prosper Borrowing History
@@ -331,6 +404,7 @@ cols_group_6 = [
 df_reduced = safe_drop(df_reduced, cols_group_6)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 6 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 6 - Previous Prosper Borrowing History", df_reduced)
 
 
 # GROUP 7: Loan Structure and Funding
@@ -424,6 +498,8 @@ cols_group_7 = [
 
 df_reduced = safe_drop(df_reduced, cols_group_7)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
+print_status("GROUP 7 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 7 - Loan Structure and Funding", df_reduced)
 
 # GROUP 8: Estimated Pricing Components
 # Remove highly related pricing outputs while keeping core pricing variables.
@@ -481,6 +557,7 @@ cols_group_8 = [
 df_reduced = safe_drop(df_reduced, cols_group_8)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 8 - AFTER PRICING COMPONENTS REDUCTION", df_reduced)
+record_feature_progress("After Group 8 - Estimated Pricing Components", df_reduced)
 
 # GROUP 9: Credit Capacity and Trade Structure
 # Keep compact credit capacity signals and remove overlapping trade history fields.
@@ -549,6 +626,7 @@ cols_group_9 = [
 df_reduced = safe_drop(df_reduced, cols_group_9)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 9 - AFTER CREDIT CAPACITY REDUCTION", df_reduced)
+record_feature_progress("After Group 9 - Credit Capacity and Trade Structure", df_reduced)
 
 # GROUP 10: Borrower Profile and Demographic Features
 # Remove high-cardinality borrower descriptors and keep home ownership as the compact profile signal.
@@ -643,6 +721,7 @@ cols_group_10 = [
 df_reduced = safe_drop(df_reduced, cols_group_10)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 10 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 10 - Borrower Profile", df_reduced)
 
 
 # GROUP 11: Credit Inquiry and Credit Activity Features
@@ -688,6 +767,7 @@ cols_group_11 = [
 df_reduced = safe_drop(df_reduced, cols_group_11)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 11 - AFTER DROP", df_reduced)
+record_feature_progress("After Group 11 - Credit Inquiry and Activity", df_reduced)
 
 
 # GROUP 12: Temporal and Listing Information Redundancy Analysis
@@ -755,6 +835,18 @@ cols_group_12 = [
 df_reduced = safe_drop(df_reduced, cols_group_12)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 12 - AFTER DROP", df_reduced)
+record_feature_progress("Final Reduced Dataset", df_reduced)
+
+print_feature_reduction_progress()
+print("\nConclusion:")
+print(
+    "The feature analysis workflow reduced the dataset from the original "
+    f"{feature_progress[0][1]} attributes to the final reduced feature set."
+)
+print(
+    "This step helps remove identifiers, redundant variables, high-leakage attributes, "
+    "and weak business-value features before EDA, preprocessing, and machine learning."
+)
 
 
 print("\n========== REMAINING COLUMNS ==========")
