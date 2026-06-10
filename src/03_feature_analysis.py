@@ -4,7 +4,6 @@ from pyspark.sql import SparkSession
 HDFS_INPUT_PATH = "hdfs://localhost:9000/bigdata/prosper_loan/raw/prosperLoanData.csv"
 HDFS_OUTPUT_PATH = "hdfs://localhost:9000/bigdata/prosper_loan/processed/prosper_loan_reduced"
 
-
 spark = (
     SparkSession.builder
     .appName("Prosper Loan Domain Feature Reduction")
@@ -336,12 +335,57 @@ print_status("GROUP 6 - AFTER DROP", df_reduced)
 
 # GROUP 7: Loan Structure and Funding
 # Keep core loan size, term, and investor participation features.
-print("\n========== GROUP 7 - LOAN STRUCTURE AND FUNDING ==========")
+print("\n========== GROUP 7 - LOAN STRUCTURE AND FUNDING CHECK ==========")
+
+spark.sql("""
+SELECT
+    CASE
+        WHEN LoanOriginalAmount < 5000 THEN 'Small Loan'
+        WHEN LoanOriginalAmount < 15000 THEN 'Medium Loan'
+        ELSE 'Large Loan'
+    END AS loan_size,
+
+    CASE
+        WHEN Investors < 50 THEN 'Low Investor Interest'
+        WHEN Investors < 200 THEN 'Medium Investor Interest'
+        ELSE 'High Investor Interest'
+    END AS investor_interest,
+
+    COUNT(*) AS total_loans,
+    ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+
+    ROUND(
+        SUM(CASE 
+            WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1 
+            ELSE 0 
+        END) / COUNT(*), 
+        4
+    ) AS bad_loan_rate
+
+FROM prosper_loan_reduced
+WHERE LoanOriginalAmount IS NOT NULL
+  AND Investors IS NOT NULL
+  AND BorrowerAPR IS NOT NULL
+  AND LoanStatus IS NOT NULL
+GROUP BY
+    CASE
+        WHEN LoanOriginalAmount < 5000 THEN 'Small Loan'
+        WHEN LoanOriginalAmount < 15000 THEN 'Medium Loan'
+        ELSE 'Large Loan'
+    END,
+    CASE
+        WHEN Investors < 50 THEN 'Low Investor Interest'
+        WHEN Investors < 200 THEN 'Medium Investor Interest'
+        ELSE 'High Investor Interest'
+    END
+ORDER BY bad_loan_rate DESC, avg_apr DESC
+""").show(truncate=False)
+
 
 spark.sql("""
 SELECT
     Term,
-    COUNT(*) AS total_loans,
+    COUNT(*) AS loans,
     ROUND(AVG(BorrowerAPR), 4) AS avg_apr
 FROM prosper_loan_reduced
 WHERE Term IS NOT NULL
@@ -349,7 +393,27 @@ GROUP BY Term
 ORDER BY Term
 """).show(truncate=False)
 
-print("Conclusion: Term is retained because loan structure affects pricing.")
+
+spark.sql("""
+SELECT
+    CASE
+        WHEN Investors < 50 THEN 'Low'
+        WHEN Investors < 200 THEN 'Medium'
+        ELSE 'High'
+    END AS investor_group,
+    COUNT(*) AS loans,
+    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
+FROM prosper_loan_reduced
+WHERE Investors IS NOT NULL
+GROUP BY
+    CASE
+        WHEN Investors < 50 THEN 'Low'
+        WHEN Investors < 200 THEN 'Medium'
+        ELSE 'High'
+    END
+ORDER BY avg_apr DESC
+""").show(truncate=False)
+
 
 cols_group_7 = [
     "MonthlyLoanPayment",
@@ -360,36 +424,55 @@ cols_group_7 = [
 
 df_reduced = safe_drop(df_reduced, cols_group_7)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
-print_status("GROUP 7 - AFTER DROP", df_reduced)
-
 
 # GROUP 8: Estimated Pricing Components
 # Remove highly related pricing outputs while keeping core pricing variables.
-print("\n========== GROUP 8 - ESTIMATED PRICING COMPONENTS ==========")
+print("\n========== GROUP 8 - ESTIMATED LOSS AND RISK-BASED PRICING CHECK ==========")
 
 spark.sql("""
 SELECT
     CASE
-        WHEN BorrowerRate < 0.10 THEN 'Low Rate'
-        WHEN BorrowerRate < 0.20 THEN 'Medium Rate'
-        ELSE 'High Rate'
-    END AS rate_group,
+        WHEN EstimatedLoss < 0.05 THEN 'Low Expected Loss'
+        WHEN EstimatedLoss < 0.10 THEN 'Medium Expected Loss'
+        ELSE 'High Expected Loss'
+    END AS expected_loss_group,
+
     COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
+
+    ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+
+    ROUND(
+        SUM(CASE
+            WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1
+            ELSE 0
+        END) / COUNT(*),
+        4
+    ) AS bad_loan_rate
+
 FROM prosper_loan_reduced
-WHERE BorrowerRate IS NOT NULL
+WHERE EstimatedLoss IS NOT NULL
+  AND BorrowerAPR IS NOT NULL
+  AND LoanStatus IS NOT NULL
 GROUP BY
     CASE
-        WHEN BorrowerRate < 0.10 THEN 'Low Rate'
-        WHEN BorrowerRate < 0.20 THEN 'Medium Rate'
-        ELSE 'High Rate'
+        WHEN EstimatedLoss < 0.05 THEN 'Low Expected Loss'
+        WHEN EstimatedLoss < 0.10 THEN 'Medium Expected Loss'
+        ELSE 'High Expected Loss'
     END
-ORDER BY avg_apr DESC
+ORDER BY bad_loan_rate DESC, avg_apr DESC
 """).show(truncate=False)
 
-print("Conclusion: BorrowerRate is retained and overlapping yield variables are removed.")
+spark.sql("""
+SELECT
+    ROUND(corr(BorrowerRate, LenderYield), 4) AS corr_rate_yield,
+    ROUND(corr(BorrowerRate, EstimatedEffectiveYield), 4) AS corr_rate_effective_yield,
+    ROUND(corr(BorrowerRate, EstimatedReturn), 4) AS corr_rate_return,
+    ROUND(corr(EstimatedLoss, EstimatedReturn), 4) AS corr_loss_return
+FROM prosper_loan_reduced
+""").show(truncate=False)
 
 cols_group_8 = [
+    "BorrowerRate",
     "LenderYield",
     "EstimatedEffectiveYield",
     "EstimatedReturn"
@@ -397,34 +480,65 @@ cols_group_8 = [
 
 df_reduced = safe_drop(df_reduced, cols_group_8)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
-print_status("GROUP 8 - AFTER DROP", df_reduced)
-
+print_status("GROUP 8 - AFTER PRICING COMPONENTS REDUCTION", df_reduced)
 
 # GROUP 9: Credit Capacity and Trade Structure
 # Keep compact credit capacity signals and remove overlapping trade history fields.
-print("\n========== GROUP 9 - CREDIT CAPACITY AND TRADE STRUCTURE ==========")
+print("\n========== GROUP 9 - DELINQUENCY AND CREDIT HISTORY RISK CHECK ==========")
 
 spark.sql("""
 SELECT
     CASE
-        WHEN TotalTrades < 10 THEN 'Low Trade Count'
-        WHEN TotalTrades < 25 THEN 'Medium Trade Count'
-        ELSE 'High Trade Count'
-    END AS trade_count_group,
+        WHEN CurrentDelinquencies = 0 THEN 'No Current Delinquency'
+        WHEN CurrentDelinquencies <= 2 THEN '1-2 Current Delinquencies'
+        ELSE '3+ Current Delinquencies'
+    END AS delinquency_group,
+
+    CASE
+        WHEN TotalTrades < 10 THEN 'Thin Credit History'
+        WHEN TotalTrades < 30 THEN 'Medium Credit History'
+        ELSE 'Strong Credit History'
+    END AS credit_history_group,
+
     COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
+    ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+
+    ROUND(
+        SUM(CASE
+            WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1
+            ELSE 0
+        END) / COUNT(*),
+        4
+    ) AS bad_loan_rate
+
 FROM prosper_loan_reduced
-WHERE TotalTrades IS NOT NULL
+WHERE CurrentDelinquencies IS NOT NULL
+  AND TotalTrades IS NOT NULL
+  AND BorrowerAPR IS NOT NULL
+  AND LoanStatus IS NOT NULL
 GROUP BY
     CASE
-        WHEN TotalTrades < 10 THEN 'Low Trade Count'
-        WHEN TotalTrades < 25 THEN 'Medium Trade Count'
-        ELSE 'High Trade Count'
+        WHEN CurrentDelinquencies = 0 THEN 'No Current Delinquency'
+        WHEN CurrentDelinquencies <= 2 THEN '1-2 Current Delinquencies'
+        ELSE '3+ Current Delinquencies'
+    END,
+    CASE
+        WHEN TotalTrades < 10 THEN 'Thin Credit History'
+        WHEN TotalTrades < 30 THEN 'Medium Credit History'
+        ELSE 'Strong Credit History'
     END
-ORDER BY avg_apr DESC
+ORDER BY bad_loan_rate DESC, avg_apr DESC
 """).show(truncate=False)
 
-print("Conclusion: TotalTrades is retained as a compact credit history depth signal.")
+
+spark.sql("""
+SELECT
+    ROUND(corr(CurrentCreditLines, TotalCreditLinespast7years), 4) AS corr_credit_history,
+    ROUND(corr(CurrentCreditLines, TotalTrades), 4) AS corr_credit_trade,
+    ROUND(corr(TotalTrades, `TradesNeverDelinquent (percentage)`), 4) AS corr_trade_quality
+FROM prosper_loan_reduced
+""").show(truncate=False)
+
 
 cols_group_9 = [
     "TradesNeverDelinquent (percentage)",
@@ -434,8 +548,7 @@ cols_group_9 = [
 
 df_reduced = safe_drop(df_reduced, cols_group_9)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
-print_status("GROUP 9 - AFTER DROP", df_reduced)
-
+print_status("GROUP 9 - AFTER CREDIT CAPACITY REDUCTION", df_reduced)
 
 # GROUP 10: Borrower Profile and Demographic Features
 # Remove high-cardinality borrower descriptors and keep home ownership as the compact profile signal.
