@@ -157,13 +157,14 @@ File yarn-site.xml được sử dụng để cấu hình YARN. Trong cấu hìn
 
 ---
 
-## 6.Giải nén file
+## 5.5. Giải nén file
 Để Hadoop có thể hoạt động ổn định trên Windows, cần bổ sung các file hỗ trợ từ bộ winutils. Các file này được giải nén và chép vào thư mục bin của Hadoop.
 
 <img width="1916" height="946" alt="image" src="https://github.com/user-attachments/assets/18033af9-9f31-45ec-a86e-21233f0ed271" />
-## 7.Khởi tạo HDFS
 
-### Format NameNode
+## 7. Khởi tạo HDFS
+
+### 7.1. Format NameNode
 Sau khi hoàn tất cấu hình các file XML, tiến hành format NameNode để khởi tạo metadata ban đầu cho hệ thống HDFS. Chạy lệnh sau trong Command Prompt hoặc PowerShell:
 
 ```bash
