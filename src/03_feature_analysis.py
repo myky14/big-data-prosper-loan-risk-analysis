@@ -852,34 +852,83 @@ record_feature_progress("After Group 10 - Borrower Profile", df_reduced)
 print("\n========== GROUP 11 - CREDIT INQUIRY AND CREDIT ACTIVITY FEATURES ==========")
 
 spark.sql("""
-SELECT
-    CASE
-        WHEN InquiriesLast6Months = 0 THEN 'No Inquiry'
-        WHEN InquiriesLast6Months <= 2 THEN '1-2 Inquiries'
-        ELSE '3+ Inquiries'
-    END AS inquiry_group,
-    COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
-FROM prosper_loan_reduced
-WHERE InquiriesLast6Months IS NOT NULL
-GROUP BY
-    CASE
-        WHEN InquiriesLast6Months = 0 THEN 'No Inquiry'
-        WHEN InquiriesLast6Months <= 2 THEN '1-2 Inquiries'
-        ELSE '3+ Inquiries'
-    END
-ORDER BY avg_apr DESC
-""").show(truncate=False)
+WITH corr_check AS (
+    SELECT
+        ROUND(corr(InquiriesLast6Months, TotalInquiries), 4) AS corr_recent_total_inquiries,
+        ROUND(corr(CurrentCreditLines, TotalTrades), 4) AS corr_current_lines_total_trades,
+        ROUND(corr(TradesOpenedLast6Months, InquiriesLast6Months), 4) AS corr_recent_trades_inquiries
+    FROM prosper_loan_reduced
+),
+base AS (
+    SELECT
+        CASE
+            WHEN InquiriesLast6Months = 0 THEN 'No Recent Inquiry'
+            WHEN InquiriesLast6Months <= 2 THEN '1-2 Recent Inquiries'
+            ELSE '3+ Recent Inquiries'
+        END AS recent_inquiry_group,
 
-spark.sql("""
-SELECT
-    corr(InquiriesLast6Months, TotalInquiries) AS corr_recent_total_inquiries,
-    corr(CurrentCreditLines, TotalTrades) AS corr_current_credit_lines_total_trades,
-    corr(TradesOpenedLast6Months, InquiriesLast6Months) AS corr_recent_trades_recent_inquiries
-FROM prosper_loan_reduced
-""").show(truncate=False)
+        CASE
+            WHEN TotalTrades < 10 THEN 'Thin Credit History'
+            WHEN TotalTrades < 30 THEN 'Medium Credit History'
+            ELSE 'Long Credit History'
+        END AS trade_history_group,
 
-print("Conclusion: InquiriesLast6Months and TotalTrades are retained, while TotalInquiries, CurrentCreditLines, and TradesOpenedLast6Months are removed as overlapping activity signals.")
+        BorrowerAPR,
+        LoanStatus,
+        TotalInquiries,
+        TradesOpenedLast6Months,
+        CurrentCreditLines,
+        TotalTrades
+    FROM prosper_loan_reduced
+    WHERE InquiriesLast6Months IS NOT NULL
+      AND TotalTrades IS NOT NULL
+      AND BorrowerAPR IS NOT NULL
+),
+agg AS (
+    SELECT
+        recent_inquiry_group,
+        trade_history_group,
+        COUNT(*) AS total_loans,
+
+        ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+
+        ROUND(
+            AVG(
+                CASE
+                    WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1.0
+                    WHEN LoanStatus = 'Completed' THEN 0.0
+                    ELSE NULL
+                END
+            ) * 100, 2
+        ) AS bad_loan_rate_percent,
+
+        ROUND(AVG(TotalInquiries), 2) AS avg_total_inquiries,
+        ROUND(AVG(TradesOpenedLast6Months), 2) AS avg_recent_trades_opened,
+        ROUND(AVG(CurrentCreditLines), 2) AS avg_current_credit_lines
+    FROM base
+    GROUP BY recent_inquiry_group, trade_history_group
+    HAVING COUNT(*) >= 100
+)
+SELECT
+    agg.*,
+    corr_check.corr_recent_total_inquiries,
+    corr_check.corr_current_lines_total_trades,
+    corr_check.corr_recent_trades_inquiries,
+    DENSE_RANK() OVER (ORDER BY avg_apr DESC) AS apr_rank,
+    DENSE_RANK() OVER (
+        ORDER BY COALESCE(bad_loan_rate_percent, -1) DESC
+    ) AS default_risk_rank
+FROM agg
+CROSS JOIN corr_check
+ORDER BY apr_rank, default_risk_rank
+""").show(80, truncate=False)
+
+print(
+    "Conclusion: InquiriesLast6Months and TotalTrades are retained because they represent "
+    "recent credit-seeking behavior and the depth of credit history. TotalInquiries, "
+    "CurrentCreditLines, and TradesOpenedLast6Months are removed because they overlap with "
+    "the retained inquiry and trade-history signals."
+)
 
 cols_group_11 = [
     "TotalInquiries",
@@ -898,55 +947,100 @@ record_feature_progress("After Group 11 - Credit Inquiry and Activity", df_reduc
 print("\n========== GROUP 12 - TEMPORAL AND LISTING INFORMATION REDUNDANCY ANALYSIS ==========")
 
 spark.sql("""
+WITH base AS (
+    SELECT
+        YEAR(LoanOriginationDate) AS orig_year,
+        QUARTER(LoanOriginationDate) AS orig_quarter,
+
+        `ListingCategory (numeric)` AS listing_category,
+
+        CASE
+            WHEN PercentFunded >= 1.0 THEN 'Fully Funded'
+            WHEN PercentFunded >= 0.8 THEN 'Mostly Funded'
+            ELSE 'Low or Medium Funded'
+        END AS funding_group,
+
+        BorrowerAPR,
+        LoanStatus,
+        ScorexChangeAtTimeOfListing,
+        PercentFunded,
+        Investors
+    FROM prosper_loan_reduced
+    WHERE LoanOriginationDate IS NOT NULL
+      AND `ListingCategory (numeric)` IS NOT NULL
+      AND PercentFunded IS NOT NULL
+      AND BorrowerAPR IS NOT NULL
+),
+agg AS (
+    SELECT
+        orig_year,
+        orig_quarter,
+        listing_category,
+        funding_group,
+        COUNT(*) AS total_loans,
+
+        ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+
+        ROUND(
+            AVG(
+                CASE
+                    WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1.0
+                    WHEN LoanStatus = 'Completed' THEN 0.0
+                    ELSE NULL
+                END
+            ) * 100, 2
+        ) AS bad_loan_rate_percent,
+
+        ROUND(AVG(PercentFunded), 4) AS avg_percent_funded,
+        ROUND(AVG(Investors), 2) AS avg_investors,
+        ROUND(AVG(ScorexChangeAtTimeOfListing), 2) AS avg_score_change,
+
+        ROUND(
+            AVG(
+                CASE
+                    WHEN ScorexChangeAtTimeOfListing < 0 THEN 1.0
+                    ELSE 0.0
+                END
+            ) * 100, 2
+        ) AS score_decrease_percent
+    FROM base
+    GROUP BY orig_year, orig_quarter, listing_category, funding_group
+    HAVING COUNT(*) >= 100
+),
+time_check AS (
+    SELECT
+        *,
+        LAG(avg_apr) OVER (
+            PARTITION BY listing_category, funding_group
+            ORDER BY orig_year, orig_quarter
+        ) AS prev_quarter_avg_apr
+    FROM agg
+)
 SELECT
-    `ListingCategory (numeric)` AS listing_category,
-    COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
-FROM prosper_loan_reduced
-WHERE `ListingCategory (numeric)` IS NOT NULL
-GROUP BY `ListingCategory (numeric)`
-ORDER BY avg_apr DESC
+    *,
+    ROUND(avg_apr - prev_quarter_avg_apr, 4) AS apr_change_vs_prev_quarter,
+    DENSE_RANK() OVER (
+        PARTITION BY orig_year, orig_quarter
+        ORDER BY avg_apr DESC
+    ) AS quarterly_apr_rank
+FROM time_check
+ORDER BY orig_year, orig_quarter, quarterly_apr_rank
 """).show(100, truncate=False)
 
 spark.sql("""
 SELECT
-    corr(PercentFunded, Investors) AS corr_percent_funded_investors
+    ROUND(corr(PercentFunded, Investors), 4) AS corr_percent_funded_investors
 FROM prosper_loan_reduced
 WHERE PercentFunded IS NOT NULL
+  AND Investors IS NOT NULL
 """).show(truncate=False)
 
-spark.sql("""
-SELECT
-    LoanOriginationQuarter,
-    COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
-FROM prosper_loan_reduced
-WHERE LoanOriginationQuarter IS NOT NULL
-GROUP BY LoanOriginationQuarter
-ORDER BY LoanOriginationQuarter
-""").show(100, truncate=False)
-
-spark.sql("""
-SELECT
-    CASE
-        WHEN ScorexChangeAtTimeOfListing < 0 THEN 'Negative'
-        WHEN ScorexChangeAtTimeOfListing > 0 THEN 'Positive'
-        ELSE 'No Change'
-    END AS score_change_group,
-    COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
-FROM prosper_loan_reduced
-WHERE ScorexChangeAtTimeOfListing IS NOT NULL
-GROUP BY
-    CASE
-        WHEN ScorexChangeAtTimeOfListing < 0 THEN 'Negative'
-        WHEN ScorexChangeAtTimeOfListing > 0 THEN 'Positive'
-        ELSE 'No Change'
-    END
-ORDER BY avg_apr DESC
-""").show(truncate=False)
-
-print("Conclusion: Investors is retained, while ListingCategory (numeric), PercentFunded, LoanOriginationQuarter, and ScorexChangeAtTimeOfListing are removed as weak listing or temporal descriptors.")
+print(
+    "Conclusion: Investors is retained as the stronger funding-market signal. "
+    "ListingCategory (numeric), PercentFunded, LoanOriginationQuarter, and "
+    "ScorexChangeAtTimeOfListing are removed because they are weak, unstable, or mostly "
+    "descriptive listing and temporal variables after stronger credit-risk features are retained."
+)
 
 cols_group_12 = [
     "ListingCategory (numeric)",
@@ -959,6 +1053,7 @@ df_reduced = safe_drop(df_reduced, cols_group_12)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 12 - AFTER DROP", df_reduced)
 record_feature_progress("Final Reduced Dataset", df_reduced)
+
 
 print_feature_reduction_progress()
 print("\nConclusion:")
