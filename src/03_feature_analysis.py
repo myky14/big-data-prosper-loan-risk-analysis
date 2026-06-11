@@ -336,26 +336,71 @@ record_feature_progress("After Group 4 - Debt and Credit Utilization", df_reduce
 print("\n========== GROUP 5 - DELINQUENCY AND PUBLIC RECORDS ==========")
 
 spark.sql("""
-SELECT
-    CASE
-        WHEN CurrentDelinquencies = 0 THEN 'No Delinquency'
-        WHEN CurrentDelinquencies <= 2 THEN '1-2 Delinquencies'
-        ELSE '3+ Delinquencies'
-    END AS delinquency_group,
-    COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
-FROM prosper_loan_reduced
-WHERE CurrentDelinquencies IS NOT NULL
-GROUP BY
-    CASE
-        WHEN CurrentDelinquencies = 0 THEN 'No Delinquency'
-        WHEN CurrentDelinquencies <= 2 THEN '1-2 Delinquencies'
-        ELSE '3+ Delinquencies'
-    END
-ORDER BY avg_apr DESC
-""").show(truncate=False)
+WITH base AS (
+    SELECT
+        CASE
+            WHEN CurrentDelinquencies = 0 THEN 'No Current Delinquency'
+            WHEN CurrentDelinquencies <= 2 THEN '1-2 Current Delinquencies'
+            ELSE '3+ Current Delinquencies'
+        END AS current_delinquency_group,
 
-print("Conclusion: CurrentDelinquencies is retained as a concise delinquency signal.")
+        CASE
+            WHEN DelinquenciesLast7Years = 0 THEN 'No 7Y Delinquency'
+            WHEN DelinquenciesLast7Years <= 2 THEN '1-2 in 7Y'
+            WHEN DelinquenciesLast7Years <= 5 THEN '3-5 in 7Y'
+            ELSE '5+ in 7Y'
+        END AS delinquency_history_group,
+
+        BorrowerAPR,
+        LoanStatus,
+        AmountDelinquent,
+        PublicRecordsLast10Years,
+        PublicRecordsLast12Months
+    FROM prosper_loan_reduced
+    WHERE CurrentDelinquencies IS NOT NULL
+      AND DelinquenciesLast7Years IS NOT NULL
+      AND BorrowerAPR IS NOT NULL
+),
+agg AS (
+    SELECT
+        current_delinquency_group,
+        delinquency_history_group,
+        COUNT(*) AS total_loans,
+
+        ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+
+        ROUND(
+            AVG(
+                CASE
+                    WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1.0
+                    WHEN LoanStatus = 'Completed' THEN 0.0
+                    ELSE NULL
+                END
+            ) * 100, 2
+        ) AS bad_loan_rate_percent,
+
+        ROUND(AVG(COALESCE(AmountDelinquent, 0)), 2) AS avg_amount_delinquent,
+        ROUND(AVG(COALESCE(PublicRecordsLast10Years, 0)), 2) AS avg_public_records_10y,
+        ROUND(AVG(COALESCE(PublicRecordsLast12Months, 0)), 2) AS avg_public_records_12m
+    FROM base
+    GROUP BY current_delinquency_group, delinquency_history_group
+    HAVING COUNT(*) >= 100
+)
+SELECT
+    *,
+    DENSE_RANK() OVER (ORDER BY avg_apr DESC) AS apr_risk_rank,
+    DENSE_RANK() OVER (
+        ORDER BY COALESCE(bad_loan_rate_percent, -1) DESC
+    ) AS default_risk_rank
+FROM agg
+ORDER BY apr_risk_rank, default_risk_rank
+""").show(50, truncate=False)
+
+print(
+    "Conclusion: CurrentDelinquencies and DelinquenciesLast7Years are retained because "
+    "they jointly capture current and historical delinquency risk. AmountDelinquent and "
+    "PublicRecordsLast12Months are removed as weaker or overlapping delinquency-related signals."
+)
 
 cols_group_5 = [
     "AmountDelinquent",
@@ -373,26 +418,71 @@ record_feature_progress("After Group 5 - Delinquency and Public Records", df_red
 print("\n========== GROUP 6 - PREVIOUS PROSPER BORROWING HISTORY ==========")
 
 spark.sql("""
-SELECT
-    CASE
-        WHEN TotalProsperLoans = 0 THEN 'No Previous Loan'
-        WHEN TotalProsperLoans = 1 THEN '1 Loan'
-        ELSE '2+ Loans'
-    END AS prosper_history_group,
-    COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
-FROM prosper_loan_reduced
-WHERE TotalProsperLoans IS NOT NULL
-GROUP BY
-    CASE
-        WHEN TotalProsperLoans = 0 THEN 'No Previous Loan'
-        WHEN TotalProsperLoans = 1 THEN '1 Loan'
-        ELSE '2+ Loans'
-    END
-ORDER BY avg_apr DESC
-""").show(truncate=False)
+WITH base AS (
+    SELECT
+        CASE
+            WHEN COALESCE(TotalProsperLoans, 0) = 0 THEN 'No Previous Loan'
+            WHEN COALESCE(TotalProsperLoans, 0) = 1 THEN '1 Previous Loan'
+            ELSE '2+ Previous Loans'
+        END AS prosper_loan_history,
 
-print("Conclusion: TotalProsperLoans is retained to represent prior platform experience.")
+        CASE
+            WHEN COALESCE(ProsperPaymentsOneMonthPlusLate, 0) = 0
+                THEN 'No 1M+ Late Payment'
+            ELSE 'Has 1M+ Late Payment'
+        END AS prosper_late_payment_group,
+
+        BorrowerAPR,
+        LoanStatus,
+        TotalProsperPaymentsBilled,
+        OnTimeProsperPayments,
+        ProsperPrincipalBorrowed,
+        ProsperPrincipalOutstanding
+    FROM prosper_loan_reduced
+    WHERE BorrowerAPR IS NOT NULL
+),
+agg AS (
+    SELECT
+        prosper_loan_history,
+        prosper_late_payment_group,
+        COUNT(*) AS total_loans,
+
+        ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+
+        ROUND(
+            AVG(
+                CASE
+                    WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1.0
+                    WHEN LoanStatus = 'Completed' THEN 0.0
+                    ELSE NULL
+                END
+            ) * 100, 2
+        ) AS bad_loan_rate_percent,
+
+        ROUND(AVG(COALESCE(OnTimeProsperPayments, 0)), 2) AS avg_on_time_payments,
+        ROUND(AVG(COALESCE(TotalProsperPaymentsBilled, 0)), 2) AS avg_payments_billed,
+        ROUND(AVG(COALESCE(ProsperPrincipalBorrowed, 0)), 2) AS avg_principal_borrowed,
+        ROUND(AVG(COALESCE(ProsperPrincipalOutstanding, 0)), 2) AS avg_principal_outstanding
+    FROM base
+    GROUP BY prosper_loan_history, prosper_late_payment_group
+    HAVING COUNT(*) >= 100
+)
+SELECT
+    *,
+    DENSE_RANK() OVER (ORDER BY avg_apr DESC) AS apr_risk_rank,
+    DENSE_RANK() OVER (
+        ORDER BY COALESCE(bad_loan_rate_percent, -1) DESC
+    ) AS default_risk_rank
+FROM agg
+ORDER BY apr_risk_rank, default_risk_rank
+""").show(50, truncate=False)
+
+print(
+    "Conclusion: TotalProsperLoans is retained to represent prior platform experience, "
+    "and ProsperPaymentsOneMonthPlusLate is retained as a direct late-payment risk signal. "
+    "Payment count and principal amount variables are removed because they mainly describe "
+    "transaction volume and may overlap with prior borrowing history."
+)
 
 cols_group_6 = [
     "TotalProsperPaymentsBilled",
@@ -412,82 +502,79 @@ record_feature_progress("After Group 6 - Previous Prosper Borrowing History", df
 print("\n========== GROUP 7 - LOAN STRUCTURE AND FUNDING CHECK ==========")
 
 spark.sql("""
+WITH base AS (
+    SELECT
+        CASE
+            WHEN LoanOriginalAmount < 5000 THEN 'Small Loan'
+            WHEN LoanOriginalAmount < 15000 THEN 'Medium Loan'
+            ELSE 'Large Loan'
+        END AS loan_size_group,
+
+        Term,
+
+        CASE
+            WHEN Investors < 50 THEN 'Low Investor Interest'
+            WHEN Investors < 200 THEN 'Medium Investor Interest'
+            ELSE 'High Investor Interest'
+        END AS investor_group,
+
+        BorrowerAPR,
+        LoanStatus,
+        MonthlyLoanPayment,
+        PercentFunded,
+        Recommendations,
+        InvestmentFromFriendsCount,
+        InvestmentFromFriendsAmount
+    FROM prosper_loan_reduced
+    WHERE LoanOriginalAmount IS NOT NULL
+      AND Term IS NOT NULL
+      AND Investors IS NOT NULL
+      AND BorrowerAPR IS NOT NULL
+),
+agg AS (
+    SELECT
+        loan_size_group,
+        Term,
+        investor_group,
+        COUNT(*) AS total_loans,
+
+        ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+
+        ROUND(
+            AVG(
+                CASE
+                    WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1.0
+                    WHEN LoanStatus = 'Completed' THEN 0.0
+                    ELSE NULL
+                END
+            ) * 100, 2
+        ) AS bad_loan_rate_percent,
+
+        ROUND(AVG(MonthlyLoanPayment), 2) AS avg_monthly_payment,
+        ROUND(AVG(PercentFunded), 4) AS avg_percent_funded,
+        ROUND(AVG(Recommendations), 2) AS avg_recommendations,
+        ROUND(AVG(InvestmentFromFriendsCount), 2) AS avg_friend_invest_count,
+        ROUND(AVG(InvestmentFromFriendsAmount), 2) AS avg_friend_invest_amount
+    FROM base
+    GROUP BY loan_size_group, Term, investor_group
+    HAVING COUNT(*) >= 100
+)
 SELECT
-    CASE
-        WHEN LoanOriginalAmount < 5000 THEN 'Small Loan'
-        WHEN LoanOriginalAmount < 15000 THEN 'Medium Loan'
-        ELSE 'Large Loan'
-    END AS loan_size,
+    *,
+    DENSE_RANK() OVER (ORDER BY avg_apr DESC) AS apr_rank,
+    DENSE_RANK() OVER (
+        ORDER BY COALESCE(bad_loan_rate_percent, -1) DESC
+    ) AS default_risk_rank
+FROM agg
+ORDER BY apr_rank, default_risk_rank
+""").show(80, truncate=False)
 
-    CASE
-        WHEN Investors < 50 THEN 'Low Investor Interest'
-        WHEN Investors < 200 THEN 'Medium Investor Interest'
-        ELSE 'High Investor Interest'
-    END AS investor_interest,
-
-    COUNT(*) AS total_loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
-
-    ROUND(
-        SUM(CASE 
-            WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1 
-            ELSE 0 
-        END) / COUNT(*), 
-        4
-    ) AS bad_loan_rate
-
-FROM prosper_loan_reduced
-WHERE LoanOriginalAmount IS NOT NULL
-  AND Investors IS NOT NULL
-  AND BorrowerAPR IS NOT NULL
-  AND LoanStatus IS NOT NULL
-GROUP BY
-    CASE
-        WHEN LoanOriginalAmount < 5000 THEN 'Small Loan'
-        WHEN LoanOriginalAmount < 15000 THEN 'Medium Loan'
-        ELSE 'Large Loan'
-    END,
-    CASE
-        WHEN Investors < 50 THEN 'Low Investor Interest'
-        WHEN Investors < 200 THEN 'Medium Investor Interest'
-        ELSE 'High Investor Interest'
-    END
-ORDER BY bad_loan_rate DESC, avg_apr DESC
-""").show(truncate=False)
-
-
-spark.sql("""
-SELECT
-    Term,
-    COUNT(*) AS loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
-FROM prosper_loan_reduced
-WHERE Term IS NOT NULL
-GROUP BY Term
-ORDER BY Term
-""").show(truncate=False)
-
-
-spark.sql("""
-SELECT
-    CASE
-        WHEN Investors < 50 THEN 'Low'
-        WHEN Investors < 200 THEN 'Medium'
-        ELSE 'High'
-    END AS investor_group,
-    COUNT(*) AS loans,
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr
-FROM prosper_loan_reduced
-WHERE Investors IS NOT NULL
-GROUP BY
-    CASE
-        WHEN Investors < 50 THEN 'Low'
-        WHEN Investors < 200 THEN 'Medium'
-        ELSE 'High'
-    END
-ORDER BY avg_apr DESC
-""").show(truncate=False)
-
+print(
+    "Conclusion: LoanOriginalAmount, Term, and Investors are retained because they represent "
+    "loan size, contract structure, and market funding interest. MonthlyLoanPayment, "
+    "Recommendations, InvestmentFromFriendsCount, and InvestmentFromFriendsAmount are removed "
+    "because they are derivative, sparse, or provide limited additional business value."
+)
 
 cols_group_7 = [
     "MonthlyLoanPayment",
@@ -501,51 +588,86 @@ df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 7 - AFTER DROP", df_reduced)
 record_feature_progress("After Group 7 - Loan Structure and Funding", df_reduced)
 
+
 # GROUP 8: Estimated Pricing Components
-# Remove highly related pricing outputs while keeping core pricing variables.
-print("\n========== GROUP 8 - ESTIMATED LOSS AND RISK-BASED PRICING CHECK ==========")
+# Remove pricing-output variables while retaining EstimatedLoss as the core expected risk signal.
+print("\n========== GROUP 8 - ESTIMATED LOSS AND PRICING LEAKAGE CHECK ==========")
 
 spark.sql("""
+WITH corr_check AS (
+    SELECT
+        ROUND(corr(BorrowerAPR, BorrowerRate), 4) AS corr_apr_borrower_rate,
+        ROUND(corr(BorrowerAPR, LenderYield), 4) AS corr_apr_lender_yield,
+        ROUND(corr(BorrowerAPR, EstimatedEffectiveYield), 4) AS corr_apr_effective_yield,
+        ROUND(corr(BorrowerAPR, EstimatedReturn), 4) AS corr_apr_estimated_return,
+        ROUND(corr(EstimatedLoss, EstimatedReturn), 4) AS corr_loss_return
+    FROM prosper_loan_reduced
+),
+base AS (
+    SELECT
+        CASE
+            WHEN EstimatedLoss < 0.05 THEN 'Low Expected Loss'
+            WHEN EstimatedLoss < 0.10 THEN 'Medium Expected Loss'
+            ELSE 'High Expected Loss'
+        END AS expected_loss_group,
+
+        BorrowerAPR,
+        LoanStatus,
+        EstimatedLoss,
+        BorrowerRate,
+        LenderYield,
+        EstimatedEffectiveYield,
+        EstimatedReturn
+    FROM prosper_loan_reduced
+    WHERE EstimatedLoss IS NOT NULL
+      AND BorrowerAPR IS NOT NULL
+),
+agg AS (
+    SELECT
+        expected_loss_group,
+        COUNT(*) AS total_loans,
+
+        ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
+        ROUND(AVG(EstimatedLoss), 4) AS avg_estimated_loss,
+        ROUND(AVG(BorrowerRate), 4) AS avg_borrower_rate,
+        ROUND(AVG(LenderYield), 4) AS avg_lender_yield,
+        ROUND(AVG(EstimatedEffectiveYield), 4) AS avg_effective_yield,
+        ROUND(AVG(EstimatedReturn), 4) AS avg_estimated_return,
+
+        ROUND(
+            AVG(
+                CASE
+                    WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1.0
+                    WHEN LoanStatus = 'Completed' THEN 0.0
+                    ELSE NULL
+                END
+            ) * 100, 2
+        ) AS bad_loan_rate_percent
+    FROM base
+    GROUP BY expected_loss_group
+)
 SELECT
-    CASE
-        WHEN EstimatedLoss < 0.05 THEN 'Low Expected Loss'
-        WHEN EstimatedLoss < 0.10 THEN 'Medium Expected Loss'
-        ELSE 'High Expected Loss'
-    END AS expected_loss_group,
-
-    COUNT(*) AS total_loans,
-
-    ROUND(AVG(BorrowerAPR), 4) AS avg_apr,
-
-    ROUND(
-        SUM(CASE
-            WHEN LoanStatus IN ('Chargedoff', 'Defaulted') THEN 1
-            ELSE 0
-        END) / COUNT(*),
-        4
-    ) AS bad_loan_rate
-
-FROM prosper_loan_reduced
-WHERE EstimatedLoss IS NOT NULL
-  AND BorrowerAPR IS NOT NULL
-  AND LoanStatus IS NOT NULL
-GROUP BY
-    CASE
-        WHEN EstimatedLoss < 0.05 THEN 'Low Expected Loss'
-        WHEN EstimatedLoss < 0.10 THEN 'Medium Expected Loss'
-        ELSE 'High Expected Loss'
-    END
-ORDER BY bad_loan_rate DESC, avg_apr DESC
+    agg.*,
+    corr_check.corr_apr_borrower_rate,
+    corr_check.corr_apr_lender_yield,
+    corr_check.corr_apr_effective_yield,
+    corr_check.corr_apr_estimated_return,
+    corr_check.corr_loss_return,
+    DENSE_RANK() OVER (ORDER BY avg_apr DESC) AS apr_rank,
+    DENSE_RANK() OVER (
+        ORDER BY COALESCE(bad_loan_rate_percent, -1) DESC
+    ) AS default_risk_rank
+FROM agg
+CROSS JOIN corr_check
+ORDER BY apr_rank, default_risk_rank
 """).show(truncate=False)
 
-spark.sql("""
-SELECT
-    ROUND(corr(BorrowerRate, LenderYield), 4) AS corr_rate_yield,
-    ROUND(corr(BorrowerRate, EstimatedEffectiveYield), 4) AS corr_rate_effective_yield,
-    ROUND(corr(BorrowerRate, EstimatedReturn), 4) AS corr_rate_return,
-    ROUND(corr(EstimatedLoss, EstimatedReturn), 4) AS corr_loss_return
-FROM prosper_loan_reduced
-""").show(truncate=False)
+print(
+    "Conclusion: EstimatedLoss is retained because it represents expected credit risk. "
+    "BorrowerRate, LenderYield, EstimatedEffectiveYield, and EstimatedReturn are removed "
+    "because they are pricing-output variables that are highly related to BorrowerAPR and may "
+    "introduce target leakage or redundant pricing information in the APR prediction task."
+)
 
 cols_group_8 = [
     "BorrowerRate",
@@ -558,6 +680,7 @@ df_reduced = safe_drop(df_reduced, cols_group_8)
 df_reduced.createOrReplaceTempView("prosper_loan_reduced")
 print_status("GROUP 8 - AFTER PRICING COMPONENTS REDUCTION", df_reduced)
 record_feature_progress("After Group 8 - Estimated Pricing Components", df_reduced)
+
 
 # GROUP 9: Credit Capacity and Trade Structure
 # Keep compact credit capacity signals and remove overlapping trade history fields.
