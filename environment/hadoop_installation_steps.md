@@ -19,7 +19,7 @@
 <img width="1259" height="1004" alt="Untitled design" src="https://github.com/user-attachments/assets/b7c9ed7f-8a2f-42a0-897c-79dcd1208cb9" />
 
 ## 3. Cài đặt Java
-### Tải Java
+### 3.1. Tải Java
 Để Hadoop có thể hoạt động trên Windows, nhóm sử dụng OpenJDK 8 làm môi trường chạy Java. Bộ cài được tải từ trang OpenLogic OpenJDK với các thông tin lựa chọn như sau:
 - Java version: OpenJDK 8
 - Operating system: Windows
@@ -33,7 +33,7 @@ Sau khi tải về, thư mục JDK được giải nén vào đường dẫn:
 ```bash
 D:\BIGDATA_THM\JAVA\openlogic-openjdk-8u492-b09-windows-x64
 ```
-### Set biến môi trường
+### 3.2. Set biến môi trường
 Cấu hình biến môi trường JAVA_HOME và bổ sung đường dẫn Java vào biến Path.
 - Tạo biến hệ thống JAVA_HOME
 - Giá trị của JAVA_HOME trỏ đến thư mục cài đặt JDK 8
@@ -41,7 +41,7 @@ Cấu hình biến môi trường JAVA_HOME và bổ sung đường dẫn Java v
 - Thêm %JAVA_HOME%\bin vào biến Path
 <img width="877" height="966" alt="Untitled design (2)" src="https://github.com/user-attachments/assets/f3641dc3-df94-4a0d-bd9b-50ea4e6e3692" />
 
-### Kiểm tra Java
+### 3.3. Kiểm tra Java
 Mở Command Prompt/PowerShell mới và thực hiện lệnh sau để kiểm tra phiên bản Java:
 
 ```bash
