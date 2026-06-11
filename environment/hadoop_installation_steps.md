@@ -86,6 +86,7 @@ hadoop version
 
 ### 5.1. File core-site.xml
 File core-site.xml được sử dụng để cấu hình địa chỉ mặc định của hệ thống tệp phân tán HDFS. Trong cấu hình này, thuộc tính fs.defaultFS được thiết lập là hdfs://localhost:9000, cho biết Hadoop sẽ kết nối đến NameNode chạy trên máy local tại cổng 9000.
+Nội dung cấu hình: 
 ```bash
 <configuration>
     <property>
@@ -122,6 +123,7 @@ Nội dung cấu hình:
 
 ### 5.3. File mapred-site.xml
 File mapred-site.xml được sử dụng để cấu hình framework thực thi MapReduce. Trong cấu hình này, thuộc tính mapreduce.framework.name được thiết lập là yarn, cho phép các tác vụ MapReduce được thực thi thông qua YARN.
+Nội dung cấu hình:
 ```bash
 <configuration>
     <property>
@@ -130,11 +132,12 @@ File mapred-site.xml được sử dụng để cấu hình framework thực thi
     </property>
 </configuration>
 ```
-<img width="1011" height="421" alt="image" src="https://github.com/user-attachments/assets/63b4669f-8953-4a3b-8097-c109ed90cbe8" />
 
 ### 5.4. File yarn-site.xml
 
 File yarn-site.xml được sử dụng để cấu hình YARN. Trong cấu hình này, dịch vụ mapreduce_shuffle được khai báo để NodeManager có thể hỗ trợ quá trình thực thi các tác vụ MapReduce trên YARN.
+
+Nội dung cấu hình:
 ```bash
 <configuration>
     <property>
@@ -148,6 +151,7 @@ File yarn-site.xml được sử dụng để cấu hình YARN. Trong cấu hìn
     </property>
 </configuration>
 ```
+
 ## 5.5. Giải nén file
 Do Hadoop được phát triển chủ yếu cho môi trường Linux, khi chạy trên Windows cần bổ sung bộ công cụ winutils. Nhóm giải nén file winutils và sao chép các file cần thiết như winutils.exe và hadoop.dll vào thư mục bin của Hadoop.
 
