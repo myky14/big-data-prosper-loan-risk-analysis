@@ -19,7 +19,7 @@
 <img width="1259" height="1004" alt="Untitled design" src="https://github.com/user-attachments/assets/b7c9ed7f-8a2f-42a0-897c-79dcd1208cb9" />
 
 ## 3. Cài đặt Java
-### Tải Hadoop
+### Tải Java
 Để Hadoop có thể hoạt động trên Windows, nhóm sử dụng OpenJDK 8 làm môi trường chạy Java. Bộ cài được tải từ trang OpenLogic OpenJDK với các thông tin lựa chọn như sau:
 - Java version: OpenJDK 8
 - Operating system: Windows
