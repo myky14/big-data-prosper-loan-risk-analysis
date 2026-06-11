@@ -101,7 +101,6 @@ Screenshot:
 File hdfs-site.xml được sử dụng để cấu hình các thông số liên quan đến HDFS. Do hệ thống được triển khai theo mô hình Single Node, số lượng bản sao dữ liệu được thiết lập là 1 thông qua thuộc tính dfs.replication.
 
 Ngoài ra, file này cũng khai báo thư mục lưu trữ metadata của NameNode và dữ liệu block của DataNode. Trước khi cấu hình, tạo hai thư mục lưu trữ dữ liệu cho HDFS là datanode và namenode:
-<img width="555" height="223" alt="image" src="https://github.com/user-attachments/assets/455ac189-5fb7-4de1-a96c-48b455243675" />
 
 Nội dung cấu hình: 
 ```bash
