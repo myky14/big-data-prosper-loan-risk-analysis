@@ -101,14 +101,6 @@ Nếu PySpark khởi động thành công và hiển thị SparkSession, điều
 
 <img width="954" height="359" alt="image" src="https://github.com/user-attachments/assets/2e5206cc-96c7-40e0-b2c5-a07fe7f44823" />
 
-Trong PySpark hoặc Jupyter Notebook, nhóm có thể tạo SparkSession: 
-```python
-from pyspark.sql import SparkSession
-
-spark = SparkSession.builder \
-    .appName("ProsperLoanProject") \
-    .getOrCreate()
-```
 
 ### Tạo SparkSession
 
@@ -119,102 +111,10 @@ spark = SparkSession.builder \
     .appName("ProsperLoanProject") \
     .getOrCreate()
 ```
-
-Screenshot:
-
-* [ ] PySpark Running
+<img width="1200" height="176" alt="image" src="https://github.com/user-attachments/assets/ae53d6b7-8c0e-4155-b335-67ebe57b4906" />
 
 ---
-
-## 7. Kết nối Spark với HDFS
-
-### Đọc dữ liệu từ HDFS
-
-Ví dụ:
-
-```python
-df = spark.read.csv(
-    "hdfs:///bigdata/prosper_loan/raw/prosperLoanData.csv",
-    header=True,
-    inferSchema=True
-)
-```
-
-Screenshot:
-
-* [ ] Dataset Loaded From HDFS
-
----
-
-## 8. Kiểm tra dữ liệu
-
-### Xem Schema
-
-```python
-df.printSchema()
-```
-
-### Xem dữ liệu mẫu
-
-```python
-df.show(5)
-```
-
-### Kiểm tra số dòng và số cột
-
-```python
-print(df.count())
-print(len(df.columns))
-```
-
-Screenshot:
-
-* [ ] Schema
-* [ ] Sample Data
-* [ ] Record Count
-
----
-
-## 9. Thực thi Spark SQL
-
-### Tạo Temporary View
-
-```python
-df.createOrReplaceTempView("prosper_loan")
-```
-
-### Chạy truy vấn thử
-
-```python
-spark.sql("""
-SELECT COUNT(*) AS total_records
-FROM prosper_loan
-""").show()
-```
-
-Screenshot:
-
-* [ ] Spark SQL Result
-
----
-
-## 10. Kiểm tra Spark Web UI
-
-### Spark UI
-
-URL:
-
-http://localhost:4040
-
-Screenshot:
-
-* [ ] Spark Jobs
-* [ ] Spark Executors
-
----
-
-## 11. Kết quả đạt được
-
+## 7. Kết quả đạt được
 * Spark cài đặt thành công
 * Spark kết nối được HDFS
 * Dataset được đọc thành công từ HDFS
