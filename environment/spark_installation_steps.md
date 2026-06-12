@@ -26,7 +26,8 @@ Mục tiêu thực hiện gồm:
 - Công cụ: Command Prompt/PowerShell, PySpark, Jupyter Notebook
 
 <img width="1259" height="1004" alt="image" src="https://github.com/user-attachments/assets/467ed4b4-200e-4a5d-9aa0-f3b41f4ff0ed" />
-<img width="716" height="469" alt="image" src="https://github.com/user-attachments/assets/1f6fd890-5938-4150-9ca3-28c153aef1db" />
+<img width="658" height="123" alt="image" src="https://github.com/user-attachments/assets/a40f55e9-aa65-4c0a-9589-6cc8ec1a5fdc" />
+<img width="1087" height="188" alt="image" src="https://github.com/user-attachments/assets/0c5c1846-a569-451e-b682-c1a9e2eab513" />
 
 ---
 
