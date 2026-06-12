@@ -39,10 +39,6 @@ numeric_type_names = {
 }
 
 manual_remove_reason_by_feature = {
-    "BorrowerRate": (
-        "Manual removal: overlaps strongly with BorrowerAPR and is excluded as a "
-        "risk-pricing proxy."
-    ),
     "LP_CustomerPayments": (
         "Manual removal: post-loan payment accounting field that may leak outcome "
         "information."
