@@ -264,7 +264,7 @@ def build_preprocessing_stages(
     else:
         final_features_col = "features"
 
-    return stages, final_features_col
+    return stages, final_features_col, assembler_inputs
 
 
 def get_feature_names_from_metadata(transformed_df, features_col: str = "features") -> List[str]:
@@ -578,7 +578,7 @@ def train_logistic_regression(train_df, test_df, numeric_cols, categorical_cols)
     """
     print_header("TRAINING MODEL 1 - LOGISTIC REGRESSION")
 
-    preprocessing_stages, final_features_col = build_preprocessing_stages(
+    preprocessing_stages, final_features_col, assembler_inputs = build_preprocessing_stages(
         numeric_cols=numeric_cols,
         categorical_cols=categorical_cols,
         use_scaler=True,
@@ -607,14 +607,12 @@ def train_logistic_regression(train_df, test_df, numeric_cols, categorical_cols)
         model_name="Logistic Regression",
     )
 
-    # For coefficient names, transform train data using preprocessing stages only.
-    preprocessing_model = Pipeline(stages=preprocessing_stages).fit(train_df)
-    transformed_train = preprocessing_model.transform(train_df)
+    transformed_train = pipeline_model.transform(train_df)
 
     print_logistic_regression_coefficients(
         fitted_pipeline_model=pipeline_model,
         transformed_train_df=transformed_train,
-        model_stage_index=len(stages) - 1,
+        model_stage_index = len(preprocessing_stages),
         top_n=15,
     )
 
@@ -632,7 +630,7 @@ def train_random_forest(train_df, test_df, numeric_cols, categorical_cols):
     """
     print_header("TRAINING MODEL 2 - RANDOM FOREST CLASSIFIER")
 
-    preprocessing_stages, final_features_col = build_preprocessing_stages(
+    preprocessing_stages, final_features_col, assembler_inputs = build_preprocessing_stages(
         numeric_cols=numeric_cols,
         categorical_cols=categorical_cols,
         use_scaler=False,
@@ -661,13 +659,12 @@ def train_random_forest(train_df, test_df, numeric_cols, categorical_cols):
         model_name="Random Forest Classifier",
     )
 
-    preprocessing_model = Pipeline(stages=preprocessing_stages).fit(train_df)
-    transformed_train = preprocessing_model.transform(train_df)
+    transformed_train = pipeline_model.transform(train_df)
 
     print_top_feature_importance(
         fitted_pipeline_model=pipeline_model,
         transformed_train_df=transformed_train,
-        model_stage_index=len(stages) - 1,
+        model_stage_index = len(preprocessing_stages),
         model_name="Random Forest Classifier",
         top_n=15,
     )
@@ -690,22 +687,20 @@ def train_gbt_classifier(train_df, test_df, numeric_cols, categorical_cols):
     """
     print_header("TRAINING MODEL 3 - GRADIENT BOOSTING CLASSIFIER")
 
-    preprocessing_stages, final_features_col = build_preprocessing_stages(
+    preprocessing_stages, final_features_col, assembler_inputs = build_preprocessing_stages(
         numeric_cols=numeric_cols,
         categorical_cols=categorical_cols,
         use_scaler=False,
     )
 
     gbt = GBTClassifier(
-        featuresCol=final_features_col,
-        labelCol="label",
-        predictionCol="prediction",
-        rawPredictionCol="rawPrediction",
-        probabilityCol="probability",
-        maxIter=50,
-        maxDepth=5,
-        stepSize=0.05,
-        seed=42,
+    featuresCol=final_features_col,
+    labelCol="label",
+    predictionCol="prediction",
+    maxIter=50,
+    maxDepth=5,
+    stepSize=0.1,
+    seed=42
     )
 
     stages = preprocessing_stages + [gbt]
@@ -720,13 +715,12 @@ def train_gbt_classifier(train_df, test_df, numeric_cols, categorical_cols):
         model_name="Gradient Boosting Classifier",
     )
 
-    preprocessing_model = Pipeline(stages=preprocessing_stages).fit(train_df)
-    transformed_train = preprocessing_model.transform(train_df)
+    transformed_train = pipeline_model.transform(train_df)
 
     print_top_feature_importance(
         fitted_pipeline_model=pipeline_model,
         transformed_train_df=transformed_train,
-        model_stage_index=len(stages) - 1,
+        model_stage_index = len(preprocessing_stages),
         model_name="Gradient Boosting Classifier",
         top_n=15,
     )
