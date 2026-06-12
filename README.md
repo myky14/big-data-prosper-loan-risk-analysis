@@ -233,9 +233,8 @@ spark-submit src/02_read_from_hdfs.py
 spark-submit src/03_feature_analysis.py
 spark-submit src/04_eda.py
 spark-submit src/05_ml_preprocessing.py
-spark-submit src/06_feature_selection.py
-spark-submit src/07_spark_sql_analysis.py
-spark-submit src/08_spark_ml_regression.py
+spark-submit src/06_ml_classification.py
+spark-submit src/07_ml_regression.py
 ```
 ---
 
