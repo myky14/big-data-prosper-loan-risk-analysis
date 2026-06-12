@@ -1,0 +1,4 @@
+model,accuracy,f1,weighted_precision,weighted_recall,roc_auc,pr_auc,tn,fp,fn,tp,bad_loan_precision,bad_loan_recall
+Logistic Regression,0.721527,0.685009,0.700892,0.721527,0.73637,0.54721,6885,595,2432,958,0.616871,0.282596
+Random Forest Classifier,0.715547,0.657966,0.699249,0.715547,0.741177,0.547777,7126,354,2738,652,0.648111,0.19233
+Gradient Boosting Classifier,0.730819,0.705601,0.712754,0.730819,0.753568,0.56124,6752,728,2198,1192,0.620833,0.351622
