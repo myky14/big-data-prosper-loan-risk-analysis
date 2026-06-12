@@ -66,7 +66,7 @@ Tạo biến môi trường hệ thống:
 Variable name: SPARK_HOME
 Variable value: D:\BIGDATA_THM\SPARK\spark-3.5.8-bin-hadoop3
 ```
-<img width="1170" height="655" alt="image" src="https://github.com/user-attachments/assets/a4edfabd-af3c-4e30-9f6c-9b6762b20997" />
+<img width="1336" height="735" alt="image" src="https://github.com/user-attachments/assets/d7f191a0-6cf4-4484-af40-b808e01ab7bf" />
 
 ### 4.2. Cấu hình Path
 
