@@ -4,7 +4,11 @@ KAFKA_TOPIC = "prosper_loan_stream"
 # Spark 3.5.x usually uses: org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0
 SPARK_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0"
 
-LOCAL_STREAM_JSON_DIR = "outputs/06_spark_ml_classification/streaming_json_sample"
+LOCAL_PROCESSED_DATA_DIR = os.path.join("data", "processed", "06_ml_classification")
+STREAM_JSON_DIR = os.path.join(
+    LOCAL_PROCESSED_DATA_DIR,
+    "streaming_json_sample",
+)
 
 HDFS_STREAM_SCHEMA_PATH = (
     "hdfs://localhost:9000/bigdata/prosper_loan/streaming/"
