@@ -1,14 +1,47 @@
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
+# IDE / editor
 .idea/
 .vscode/
 
+# Virtual environments
 env/
 venv/
 env_spark/
+.venv/
 .env
 
+# OS files
 .DS_Store
-*.log
+Thumbs.db
 
+# Logs / temp files
+*.log
+*.tmp
+*.bak
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Spark / Hadoop local runtime outputs
+checkpoints/
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Project generated outputs
+outputs/
+src/outputs/
+
+# Local processed/generated data
+data/processed/*
+!data/processed/.gitkeep
+
+# Kafka / streaming generated state
+kafka-logs/
+zookeeper-data/
+streaming-checkpoints/
+```
