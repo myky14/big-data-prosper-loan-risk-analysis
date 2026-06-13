@@ -44,4 +44,3 @@ data/processed/*
 kafka-logs/
 zookeeper-data/
 streaming-checkpoints/
-```

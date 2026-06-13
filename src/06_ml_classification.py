@@ -48,7 +48,9 @@ STREAM_DATA_HDFS_PATH = (
 OUTPUT_DIR = os.path.join("outputs", "06_ml_classification")
 TABLE_DIR = os.path.join(OUTPUT_DIR, "tables")
 FIGURE_DIR = os.path.join(OUTPUT_DIR, "figures")
-STREAM_JSON_DIR = os.path.join(OUTPUT_DIR, "streaming_json_sample")
+
+LOCAL_PROCESSED_DATA_DIR = os.path.join("data", "processed", "06_ml_classification")
+STREAM_JSON_DIR = os.path.join(LOCAL_PROCESSED_DATA_DIR, "streaming_json_sample")
 
 FEATURE_SCORE_CSV = os.path.join(TABLE_DIR, "classification_feature_score.csv")
 MODEL_METRICS_CSV = os.path.join(TABLE_DIR, "model_metrics.csv")
