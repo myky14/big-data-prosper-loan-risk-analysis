@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 FILE 06 - FEATURE SELECTION + CLASSIFICATION MODELING PIPELINE
 Project: Prosper Loan Risk Analysis using Hadoop + Spark
@@ -112,8 +111,15 @@ HDFS_BEST_MODEL_OUTPUT_PATH = (
     "best_feature_selected_model"
 )
 
+<<<<<<< Updated upstream
 LOCAL_TABLE_DIR = os.path.join("outputs", "tables", "feature_selection_modeling")
 LOCAL_FIGURE_DIR = os.path.join("outputs", "figures", "feature_selection_modeling")
+=======
+OUTPUT_DIR = os.path.join("outputs", "06_ml_classification")
+TABLE_DIR = os.path.join(OUTPUT_DIR, "tables")
+FIGURE_DIR = os.path.join(OUTPUT_DIR, "figures")
+STREAM_JSON_DIR = os.path.join(OUTPUT_DIR, "streaming_json_sample")
+>>>>>>> Stashed changes
 
 FEATURE_SELECTION_SCORES_CSV = os.path.join(LOCAL_TABLE_DIR, "feature_selection_scores.csv")
 SELECTED_FEATURES_CSV = os.path.join(LOCAL_TABLE_DIR, "selected_features.csv")

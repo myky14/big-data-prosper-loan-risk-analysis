@@ -41,7 +41,7 @@ MODEL_OUTPUT_PATH = (
     "best_borrower_apr_model"
 )
 
-OUTPUT_DIR = os.path.join("outputs", "07_spark_ml_regression")
+OUTPUT_DIR = os.path.join("outputs", "07_ml_regression")
 TABLE_DIR = os.path.join(OUTPUT_DIR, "tables")
 FIGURE_DIR = os.path.join(OUTPUT_DIR, "figures")
 
