@@ -44,7 +44,6 @@ os.makedirs(FIGURE_DIR, exist_ok=True)
 DATASET_SUMMARY_CSV = os.path.join(TABLE_DIR, "07_regression_dataset_summary.csv")
 FEATURE_SCORE_CSV = os.path.join(TABLE_DIR, "07_regression_feature_scores.csv")
 MODEL_METRICS_CSV = os.path.join(TABLE_DIR, "07_regression_model_metrics.csv")
-FEATURE_IMPORTANCE_CSV = os.path.join(TABLE_DIR, "07_gbt_feature_importance.csv")
 PREDICTION_SAMPLE_CSV = os.path.join(TABLE_DIR, "07_best_model_prediction_sample.csv")
 
 TARGET_DISTRIBUTION_FIG = os.path.join(FIGURE_DIR, "07_borrower_apr_distribution.png")
@@ -52,7 +51,6 @@ FEATURE_SCORE_FIG = os.path.join(FIGURE_DIR, "07_regression_feature_scores.png")
 MODEL_COMPARISON_FIG = os.path.join(FIGURE_DIR, "07_regression_model_comparison.png")
 ACTUAL_VS_PREDICTED_FIG = os.path.join(FIGURE_DIR, "07_actual_vs_predicted_gbt.png")
 RESIDUAL_DISTRIBUTION_FIG = os.path.join(FIGURE_DIR, "07_residual_distribution_gbt.png")
-FEATURE_IMPORTANCE_FIG = os.path.join(FIGURE_DIR, "07_gbt_feature_importance.png")
 
 
 def print_header(title):
@@ -478,52 +476,6 @@ def plot_residual_distribution(predictions, output_path):
     print(f"Saved figure: {output_path}")
 
 
-def get_feature_names_from_pipeline_model(pipeline_model, numeric_cols, categorical_cols):
-    names = list(numeric_cols)
-
-    for stage in pipeline_model.stages:
-        if stage.__class__.__name__ == "StringIndexerModel":
-            for col_name, labels in zip(categorical_cols, stage.labelsArray):
-                for label in labels:
-                    names.append(f"{col_name}={label}")
-
-    return names
-
-
-def extract_tree_feature_importance(pipeline_model, numeric_cols, categorical_cols):
-    final_model = pipeline_model.stages[-1]
-    importances = list(final_model.featureImportances.toArray())
-    names = get_feature_names_from_pipeline_model(pipeline_model, numeric_cols, categorical_cols)
-
-    rows = []
-    for i, importance in enumerate(importances):
-        feature = names[i] if i < len(names) else f"feature_{i}"
-        rows.append({"feature": feature, "importance": float(importance)})
-
-    return sorted(rows, key=lambda row: row["importance"], reverse=True)
-
-
-def plot_feature_importance(rows, output_path, top_n=15):
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        print("matplotlib is not installed. Skip feature importance figure.")
-        return
-
-    top_rows = rows[:top_n]
-    features = [r["feature"] for r in top_rows][::-1]
-    scores = [r["importance"] for r in top_rows][::-1]
-
-    plt.figure(figsize=(11, 7))
-    plt.barh(features, scores, color="#2F80ED")
-    plt.xlabel("Feature importance")
-    plt.ylabel("Feature")
-    plt.title(f"Top {top_n} Feature Importances - Best Regression Model")
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=160, bbox_inches="tight")
-    plt.close()
-    print(f"Saved figure: {output_path}")
-
 
 def save_prediction_sample(predictions, path, sample_size=200):
     rows = []
@@ -645,10 +597,6 @@ def main():
     plot_residual_distribution(best_predictions, RESIDUAL_DISTRIBUTION_FIG)
     save_prediction_sample(best_predictions, PREDICTION_SAMPLE_CSV)
 
-    if best_model_name in ["Random Forest Regressor", "GBTRegressor"]:
-        importance_rows = extract_tree_feature_importance(best_model, numeric_cols, categorical_cols)
-        write_dicts_to_csv(importance_rows, FEATURE_IMPORTANCE_CSV)
-        plot_feature_importance(importance_rows, FEATURE_IMPORTANCE_FIG)
 
     best_model.write().overwrite().save(MODEL_OUTPUT_PATH)
     print(f"Best model saved to: {MODEL_OUTPUT_PATH}")
