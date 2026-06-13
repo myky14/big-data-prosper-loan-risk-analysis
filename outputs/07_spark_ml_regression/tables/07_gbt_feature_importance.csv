@@ -1,0 +1,30 @@
+feature,importance
+EstimatedLoss,0.41844571317422385
+CreditScoreRangeLower,0.10830816749671826
+loan_origination_year,0.09824686857515826
+listing_year,0.09804340344902232
+LoanOriginalAmount,0.0640700974548364
+CurrentDelinquencies,0.029891765248686253
+InquiriesLast6Months,0.029226266835755094
+listing_month,0.027817552143535894
+loan_origination_month,0.027082680977354074
+Term,0.025225361946472052
+DebtToIncomeRatio,0.020217182292992207
+credit_pull_to_origination_days,0.01887885256089224
+credit_history_days,0.006523174458745645
+BankcardUtilization,0.006176098756727517
+DelinquenciesLast7Years,0.005642186637140516
+feature_27,0.005024531882997351
+ProsperScore,0.004935378145196494
+TotalTrades,0.0030763294056904353
+IncomeRange=$0,0.001886540595730807
+IsBorrowerHomeowner=true,0.000461417660902289
+"IncomeRange=$50,000-74,999",0.00034518370287439616
+"IncomeRange=$1-24,999",0.0001921399806583873
+"IncomeRange=$75,000-99,999",0.00014978128903091065
+IncomeRange=Not employed,8.314602817258287e-05
+"IncomeRange=$100,000+",5.0179300485508995e-05
+IsBorrowerHomeowner=false,0.0
+"IncomeRange=$25,000-49,999",0.0
+IncomeRange=Not displayed,0.0
+feature_28,0.0
