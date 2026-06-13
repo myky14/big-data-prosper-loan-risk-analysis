@@ -45,7 +45,7 @@ STREAM_DATA_HDFS_PATH = (
     "classification_simulation_data"
 )
 
-OUTPUT_DIR = os.path.join("outputs", "06_spark_ml_classification")
+OUTPUT_DIR = os.path.join("outputs", "06_ml_classification")
 TABLE_DIR = os.path.join(OUTPUT_DIR, "tables")
 FIGURE_DIR = os.path.join(OUTPUT_DIR, "figures")
 STREAM_JSON_DIR = os.path.join(OUTPUT_DIR, "streaming_json_sample")
