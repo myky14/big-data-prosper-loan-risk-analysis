@@ -101,7 +101,6 @@ def summarize_dataset(df):
         spark_max(col(TARGET_COL)).alias("max"),
         stddev(col(TARGET_COL)).alias("stddev"),
     ).collect()[0]
-
     summary = {
         "rows": int(row["rows"]),
         "columns": len(df.columns),
