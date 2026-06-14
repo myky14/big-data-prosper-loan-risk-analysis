@@ -66,9 +66,19 @@ HDFS_REGRESSION_OUTPUT_PATH = (
     "prosper_loan_preprocessed_regression"
 )
 
-LOCAL_TABLE_OUTPUT_DIR = os.path.join("outputs", "tables")
+
+CURRENT_DIR = os.getcwd()
+
+if os.path.basename(CURRENT_DIR) == "src":
+    PROJECT_DIR = os.path.dirname(CURRENT_DIR)
+else:
+    PROJECT_DIR = CURRENT_DIR
+
+OUTPUT_DIR = os.path.join(PROJECT_DIR, "outputs", "05_ml_preprocessing")
+TABLES_DIR = os.path.join(OUTPUT_DIR, "tables")
+
 MISSING_VALUE_SUMMARY_PATH = os.path.join(
-    LOCAL_TABLE_OUTPUT_DIR,
+    TABLES_DIR,
     "missing_value_summary.csv",
 )
 
@@ -246,7 +256,8 @@ def calculate_missing_summary(df):
 
 
 def save_missing_summary_locally(missing_summary):
-    os.makedirs(LOCAL_TABLE_OUTPUT_DIR, exist_ok=True)
+    os.makedirs(TABLES_DIR, exist_ok=True)
+
     with open(MISSING_VALUE_SUMMARY_PATH, "w", newline="", encoding="utf-8") as output_file:
         writer = csv.DictWriter(
             output_file,

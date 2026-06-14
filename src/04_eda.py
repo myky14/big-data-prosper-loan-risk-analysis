@@ -15,7 +15,9 @@ HDFS_EDA_REDUCED_DATASET_PATH = (
     "hdfs://localhost:9000/bigdata/prosper_loan/processed/prosper_loan_eda_reduced"
 )
 
-OUTPUT_DIR = os.path.join("outputs", "charts")
+OUTPUT_DIR = os.path.join("outputs", "04_eda")
+CHARTS_DIR = os.path.join(OUTPUT_DIR, "charts")
+TABLES_DIR = os.path.join(OUTPUT_DIR, "tables")
 
 income_order = [
     "Not displayed",
@@ -77,7 +79,8 @@ manual_remove_reason_by_feature = {
 
 
 def ensure_output_dirs():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(CHARTS_DIR, exist_ok=True)
+    os.makedirs(TABLES_DIR, exist_ok=True)
 
 
 def print_table_from_pandas(data):
@@ -273,7 +276,7 @@ def main():
     )
     plt.title("Loan Outcome Distribution")
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "loan_outcome_distribution.png"), dpi=300)
+    plt.savefig(os.path.join(CHARTS_DIR, "loan_outcome_distribution.png"), dpi=300)
     plt.close()
     print(
         "Conclusion: The dataset contains a large proportion of active or non-finalized "
@@ -296,7 +299,7 @@ def main():
     plt.xlabel("Count")
     plt.ylabel("LoanStatus")
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "loan_status_distribution.png"), dpi=300)
+    plt.savefig(os.path.join(CHARTS_DIR, "loan_status_distribution.png"), dpi=300)
     plt.close()
     print(
         "Conclusion: Current and Completed loans dominate the raw status distribution, "
@@ -320,7 +323,7 @@ def main():
     plt.ylabel("Count")
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "income_range_distribution.png"), dpi=300)
+    plt.savefig(os.path.join(CHARTS_DIR, "income_range_distribution.png"), dpi=300)
     plt.close()
     print(
         "Conclusion: Borrowers are concentrated mainly in middle-income groups, while "
@@ -360,7 +363,7 @@ def main():
     plt.xlabel("ProsperScore")
     plt.ylabel("Count")
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "prosper_score_distribution.png"), dpi=300)
+    plt.savefig(os.path.join(CHARTS_DIR, "prosper_score_distribution.png"), dpi=300)
     plt.close()
     print(
         "Conclusion: ProsperScore is concentrated in the middle range, suggesting that "
@@ -388,7 +391,7 @@ def main():
     plt.xlabel("Missing Percent")
     plt.ylabel("Feature")
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "missing_value_distribution.png"), dpi=300)
+    plt.savefig(os.path.join(CHARTS_DIR, "missing_value_distribution.png"), dpi=300)
     plt.close()
     print(
         "Conclusion: Features with missing value percentages above 80% are strong "
@@ -514,7 +517,7 @@ def main():
 
         print_table_from_pandas(corr_with_apr)
         corr_with_apr.to_csv(
-            os.path.join(OUTPUT_DIR, "correlation_with_borrower_apr.csv"),
+            os.path.join(TABLES_DIR, "correlation_with_borrower_apr.csv"),
             index=False,
         )
 
@@ -531,7 +534,7 @@ def main():
         plt.ylabel("Feature")
         plt.tight_layout()
         plt.savefig(
-            os.path.join(OUTPUT_DIR, "correlation_with_borrower_apr.png"),
+            os.path.join(CHARTS_DIR, "correlation_with_borrower_apr.png"),
             dpi=300,
             bbox_inches="tight",
         )
@@ -549,7 +552,7 @@ def main():
         high_corr_pairs = build_high_correlation_pairs(corr_matrix, threshold)
         print_table_from_pandas(high_corr_pairs)
         high_corr_pairs.to_csv(
-            os.path.join(OUTPUT_DIR, "high_correlation_pairs.csv"),
+            os.path.join(TABLES_DIR, "high_correlation_pairs.csv"),
             index=False,
         )
         print("Saved table: high_correlation_pairs.csv")
@@ -634,7 +637,7 @@ def main():
         plt.title("Correlation Matrix of Numerical Features")
         plt.tight_layout()
         plt.savefig(
-            os.path.join(OUTPUT_DIR, "correlation_matrix_heatmap.png"),
+            os.path.join(CHARTS_DIR, "correlation_matrix_heatmap.png"),
             dpi=300,
             bbox_inches="tight",
         )
@@ -650,7 +653,7 @@ def main():
         columns=["RemovedFeature", "RemovalStage", "Reason"],
     ).drop_duplicates(subset=["RemovedFeature"], keep="first")
     removed_features_by_stage_pd.to_csv(
-        os.path.join(OUTPUT_DIR, "removed_features_by_eda.csv"),
+        os.path.join(TABLES_DIR, "removed_features_by_eda.csv"),
         index=False,
     )
 

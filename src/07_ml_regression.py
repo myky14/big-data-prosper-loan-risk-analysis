@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 FILE 07 - Regression Feature Selection + MLlib Modeling
 
 Flow:
 1. Read preprocessed regression data from HDFS.
 2. Split train/test.
-3. Run regression feature selection on train data only.
+3. Run regression feature scoring/ranking on train data only.
    - Pearson correlation for numeric features.
    - Random Forest Regressor feature importance.
    - Combined score = 0.5 * normalized correlation + 0.5 * normalized RF importance.
@@ -29,7 +28,10 @@ from pyspark.sql.types import BooleanType, NumericType, StringType
 
 SEED = 42
 TRAIN_RATIO = 0.8
-TOP_N_FEATURES = 12
+
+# Feature selection is used for scoring/ranking only.
+# We keep all available features for regression modeling to avoid losing information.
+KEEP_ALL_FEATURES_FOR_MODELING = True
 TARGET_COL = "BorrowerAPR"
 
 INPUT_PATH = (
@@ -41,7 +43,24 @@ MODEL_OUTPUT_PATH = (
     "best_borrower_apr_model"
 )
 
-OUTPUT_DIR = os.path.join("outputs", "07_spark_ml_regression")
+# ============================================================
+# LOCAL OUTPUT PATHS
+# ============================================================
+# Save local outputs under the project-level outputs folder.
+# Expected structure:
+# outputs/
+# └── 07_ml_regression/
+#     ├── tables/
+#     └── figures/
+
+CURRENT_DIR = os.getcwd()
+
+if os.path.basename(CURRENT_DIR) == "src":
+    PROJECT_DIR = os.path.dirname(CURRENT_DIR)
+else:
+    PROJECT_DIR = CURRENT_DIR
+
+OUTPUT_DIR = os.path.join(PROJECT_DIR, "outputs", "07_ml_regression")
 TABLE_DIR = os.path.join(OUTPUT_DIR, "tables")
 FIGURE_DIR = os.path.join(OUTPUT_DIR, "figures")
 
@@ -174,7 +193,7 @@ def plot_feature_scores(rows):
     top_rows = rows[:20][::-1]
     plt.figure(figsize=(10, 7))
     plt.barh([r["feature"] for r in top_rows], [r["combined_score"] for r in top_rows])
-    plt.title("Regression Feature Diagnostic for BorrowerAPR")
+    plt.title("Regression Feature Ranking Diagnostic for BorrowerAPR")
     plt.xlabel("Combined feature score")
     plt.ylabel("Feature")
     plt.tight_layout()
@@ -284,7 +303,7 @@ def rf_importance_scores(train_df, numeric_cols, categorical_cols):
 
 
 def regression_feature_selection(train_df, numeric_cols, categorical_cols):
-    print_header("REGRESSION FEATURE SELECTION")
+    print_header("REGRESSION FEATURE SCORING / RANKING")
     corr_scores = correlation_scores(train_df, numeric_cols)
     rf_scores = rf_importance_scores(train_df, numeric_cols, categorical_cols)
     corr_norm = normalize(corr_scores)
@@ -302,15 +321,23 @@ def regression_feature_selection(train_df, numeric_cols, categorical_cols):
             "combined_score": round(combined, 8),
         })
     rows = sorted(rows, key=lambda r: r["combined_score"], reverse=True)
+
+    # Feature selection is used as a diagnostic/ranking step.
+    # All ranked features are kept for regression model training.
+    selected = [r["feature"] for r in rows]
+
     for rank, row in enumerate(rows, start=1):
         row["rank"] = rank
-        row["selected"] = "YES" if rank <= TOP_N_FEATURES else "NO"
-    selected = [r["feature"] for r in rows[:TOP_N_FEATURES]]
+        row["selected"] = "YES"
+
     write_dicts_to_csv(rows, FEATURE_SCORE_CSV)
     plot_feature_scores(rows)
-    print("Selected features:")
+
+    print("Feature ranking completed.")
+    print("All ranked features are kept for regression model training:")
     for i, feature in enumerate(selected, start=1):
         print(f"{i:02d}. {feature}")
+
     return selected
 
 
@@ -443,8 +470,8 @@ def main():
     train_df, test_df = train_test_split(df)
     selected_features = regression_feature_selection(train_df, numeric_cols, categorical_cols)
     selected_numeric, selected_categorical = split_feature_types(selected_features, numeric_cols, categorical_cols)
-    print(f"Selected numeric features: {selected_numeric}")
-    print(f"Selected categorical features: {selected_categorical}")
+    print(f"Numeric features kept for regression training: {selected_numeric}")
+    print(f"Categorical features kept for regression training: {selected_categorical}")
 
     metric_rows, model_objects, prediction_objects = train_regression_models(train_df, test_df, selected_numeric, selected_categorical)
     candidate_rows = [r for r in metric_rows if r["model"] != "Baseline Mean Predictor"]
