@@ -1,20 +1,49 @@
 """
-FILE 09 - Spark Structured Streaming Prediction for Prosper Loan Risk
+FILE 08 - Spark Structured Streaming Prediction for Prosper Loan Risk
 
 Purpose:
     Read streaming loan records from Kafka topic prosper_loan_stream,
-    load the best classification PipelineModel saved by file 06,
+    load the best classification PipelineModel saved by Source 06,
     predict Good Loan / Bad Loan, and write prediction results to HDFS.
 
-Flow:
-    Kafka Producer
-        -> Kafka topic: prosper_loan_stream
-        -> Spark Structured Streaming
-        -> Best Classification PipelineModel
-        -> Prediction output to HDFS
+Execution:
+    This source code is designed to be copied into main.ipynb and run as one cell.
+
+Important:
+    If Sources 00-07 were already run in the same notebook, restart the kernel
+    before running this Source 08 cell. Spark must load the Kafka connector before
+    SparkSession is created.
+
+Before running this cell:
+    1. HDFS must be running.
+    2. ZooKeeper must be running in a separate terminal.
+    3. Kafka server must be running in another separate terminal.
+    4. Source 06 must already save the best classification model and streaming JSON sample.
+
+After this cell prints:
+    STREAMING PREDICTION STARTED
+
+Open a new terminal at the project root and run:
+    python src\\09_kafka_producer.py
+    or for testing:
+    python src\\09_kafka_producer.py --limit 10 --sleep 0.1
 """
 
-import argparse
+import os
+import sys
+
+# ============================================================
+# 0. PYSPARK PACKAGE CONFIGURATION
+# ============================================================
+# This must be set BEFORE importing SparkSession / any PySpark modules.
+# Otherwise Spark cannot find the Kafka data source in notebook mode.
+
+SPARK_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.1"
+
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+os.environ["PYSPARK_SUBMIT_ARGS"] = f"--packages {SPARK_KAFKA_PACKAGE} pyspark-shell"
+
 
 from pyspark.ml import PipelineModel
 from pyspark.ml.functions import vector_to_array
@@ -22,238 +51,254 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_timestamp, from_json, lit, when
 
 
-DEFAULT_MODEL_PATH = (
+# ============================================================
+# 1. CONFIGURATION
+# ============================================================
+
+PROJECT_DIR = os.path.abspath(os.getcwd())
+
+SPARK_KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.1"
+
+KAFKA_BOOTSTRAP_SERVER = "localhost:9092"
+KAFKA_TOPIC = "prosper_loan_stream"
+
+MODEL_PATH = (
     "hdfs://localhost:9000/bigdata/prosper_loan/models/classification/"
     "best_classification_pipeline_model"
 )
 
-DEFAULT_SAMPLE_JSON_DIR = (
-    "data/processed/06_ml_classification/streaming_json_sample"
+SAMPLE_JSON_DIR = os.path.join(
+    PROJECT_DIR,
+    "data",
+    "processed",
+    "06_ml_classification",
+    "streaming_json_sample"
 )
 
-DEFAULT_OUTPUT_PATH = (
+OUTPUT_PATH = (
     "hdfs://localhost:9000/bigdata/prosper_loan/streaming/"
     "prediction_output"
 )
 
-DEFAULT_CHECKPOINT_PATH = (
+CHECKPOINT_PATH = (
     "hdfs://localhost:9000/bigdata/prosper_loan/streaming/"
     "checkpoint_prediction"
 )
 
+TRIGGER_SECONDS = 5
 
-def parse_args():
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        "--bootstrap-server",
-        default="localhost:9092",
-        help="Kafka bootstrap server."
+# Force Spark to use the same Python executable as this notebook
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+
+
+# ============================================================
+# 2. STOP OLD SPARK SESSION IF EXISTS
+# ============================================================
+
+try:
+    active_spark = SparkSession.getActiveSession()
+    if active_spark is not None:
+        print("Stopping existing SparkSession before starting streaming session...")
+        active_spark.stop()
+except Exception as error:
+    print(f"Warning while stopping existing SparkSession: {error}")
+
+
+# ============================================================
+# 3. CREATE SPARK SESSION WITH KAFKA PACKAGE
+# ============================================================
+
+print("=" * 88)
+print("SOURCE 08 - SPARK STRUCTURED STREAMING WITH KAFKA")
+print("=" * 88)
+
+print("\nProject directory:")
+print(PROJECT_DIR)
+
+print("\nKafka topic:")
+print(KAFKA_TOPIC)
+
+print("\nKafka bootstrap server:")
+print(KAFKA_BOOTSTRAP_SERVER)
+
+print("\nModel path:")
+print(MODEL_PATH)
+
+print("\nSample JSON directory:")
+print(SAMPLE_JSON_DIR)
+
+print("\nSpark Kafka package:")
+print(SPARK_KAFKA_PACKAGE)
+
+if not os.path.exists(SAMPLE_JSON_DIR):
+    raise FileNotFoundError(
+        f"Sample JSON directory not found: {SAMPLE_JSON_DIR}\n"
+        "Please run Source 06 first."
     )
 
-    parser.add_argument(
-        "--topic",
-        default="prosper_loan_stream",
-        help="Kafka topic name."
+spark = (
+    SparkSession.builder
+    .appName("Prosper_Loan_Structured_Streaming_Prediction")
+    .config("spark.jars.packages", SPARK_KAFKA_PACKAGE)
+    .getOrCreate()
+)
+
+spark.sparkContext.setLogLevel("WARN")
+
+
+# ============================================================
+# 4. INFER STREAMING INPUT SCHEMA
+# ============================================================
+
+print("\n" + "=" * 88)
+print("INFER STREAMING INPUT SCHEMA")
+print("=" * 88)
+
+sample_df = spark.read.json(SAMPLE_JSON_DIR)
+
+print("Inferred schema:")
+sample_df.printSchema()
+
+input_schema = sample_df.schema
+
+
+# ============================================================
+# 5. LOAD BEST CLASSIFICATION MODEL
+# ============================================================
+
+print("\n" + "=" * 88)
+print("LOAD BEST CLASSIFICATION MODEL")
+print("=" * 88)
+
+model = PipelineModel.load(MODEL_PATH)
+
+print("Best classification model loaded successfully.")
+
+
+# ============================================================
+# 6. READ STREAM FROM KAFKA
+# ============================================================
+
+print("\n" + "=" * 88)
+print("READ STREAM FROM KAFKA")
+print("=" * 88)
+
+kafka_df = (
+    spark.readStream
+    .format("kafka")
+    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVER)
+    .option("subscribe", KAFKA_TOPIC)
+    .option("startingOffsets", "earliest")
+    .load()
+)
+
+
+# ============================================================
+# 7. PARSE JSON MESSAGE FROM KAFKA
+# ============================================================
+
+stream_input_df = (
+    kafka_df
+    .selectExpr("CAST(value AS STRING) AS json_value")
+    .select(from_json(col("json_value"), input_schema).alias("data"))
+    .select("data.*")
+)
+
+
+# ============================================================
+# 8. APPLY MODEL PREDICTION
+# ============================================================
+
+prediction_df = model.transform(stream_input_df)
+
+result_df = (
+    prediction_df
+    .withColumn("probability_array", vector_to_array(col("probability")))
+    .withColumn("bad_loan_probability", col("probability_array")[1])
+    .withColumn("good_loan_probability", col("probability_array")[0])
+    .withColumn(
+        "prediction_label",
+        when(col("prediction") == 1.0, lit("Bad Loan"))
+        .otherwise(lit("Good Loan"))
     )
-
-    parser.add_argument(
-        "--model-path",
-        default=DEFAULT_MODEL_PATH,
-        help="HDFS path of the saved best classification PipelineModel."
-    )
-
-    parser.add_argument(
-        "--sample-json-dir",
-        default=DEFAULT_SAMPLE_JSON_DIR,
-        help="Local folder containing sample JSON files used to infer schema."
-    )
-
-    parser.add_argument(
-        "--output-path",
-        default=DEFAULT_OUTPUT_PATH,
-        help="HDFS output path for streaming prediction results."
-    )
-
-    parser.add_argument(
-        "--checkpoint-path",
-        default=DEFAULT_CHECKPOINT_PATH,
-        help="HDFS checkpoint path for Spark Structured Streaming."
-    )
-
-    parser.add_argument(
-        "--trigger-seconds",
-        type=int,
-        default=5,
-        help="Micro-batch trigger interval in seconds."
-    )
-
-    return parser.parse_args()
+    .withColumn("prediction_time", current_timestamp())
+    .drop("rawPrediction", "probability", "probability_array", "features")
+)
 
 
-def create_spark_session():
-    spark = (
-        SparkSession.builder
-        .appName("Prosper_Loan_Structured_Streaming_Prediction")
-        .getOrCreate()
-    )
+# ============================================================
+# 9. WRITE STREAMING OUTPUT WITH FOREACHBATCH
+# ============================================================
 
-    spark.sparkContext.setLogLevel("WARN")
-    return spark
+def write_prediction_batch(batch_df, batch_id):
+    print("\n" + "-" * 88)
+    print(f"BATCH ID: {batch_id}")
+    print("-" * 88)
 
+    record_count = batch_df.count()
+    print(f"Number of prediction records in this batch: {record_count}")
 
-def infer_input_schema(spark, sample_json_dir):
-    print("=" * 88)
-    print("INFER STREAMING INPUT SCHEMA")
-    print("=" * 88)
-    print(f"Sample JSON directory: {sample_json_dir}")
+    if record_count > 0:
+        print("\nPrediction result preview:")
 
-    sample_df = spark.read.json(sample_json_dir)
-
-    print("Inferred schema:")
-    sample_df.printSchema()
-
-    return sample_df.schema
-
-
-def read_kafka_stream(spark, bootstrap_server, topic):
-    print("=" * 88)
-    print("READ STREAM FROM KAFKA")
-    print("=" * 88)
-    print(f"Bootstrap server: {bootstrap_server}")
-    print(f"Topic: {topic}")
-
-    kafka_df = (
-        spark.readStream
-        .format("kafka")
-        .option("kafka.bootstrap.servers", bootstrap_server)
-        .option("subscribe", topic)
-        .option("startingOffsets", "latest")
-        .load()
-    )
-
-    return kafka_df
-
-
-def parse_kafka_json(kafka_df, input_schema):
-    parsed_df = (
-        kafka_df
-        .selectExpr("CAST(value AS STRING) AS json_value")
-        .select(from_json(col("json_value"), input_schema).alias("data"))
-        .select("data.*")
-    )
-
-    return parsed_df
-
-
-def add_prediction_columns(prediction_df):
-    result_df = (
-        prediction_df
-        .withColumn("probability_array", vector_to_array(col("probability")))
-        .withColumn("bad_loan_probability", col("probability_array")[1])
-        .withColumn("good_loan_probability", col("probability_array")[0])
-        .withColumn(
-            "prediction_label",
-            when(col("prediction") == 1.0, lit("Bad Loan"))
-            .otherwise(lit("Good Loan"))
+        (
+            batch_df
+            .select(
+                "prediction_time",
+                "prediction",
+                "prediction_label",
+                "good_loan_probability",
+                "bad_loan_probability"
+            )
+            .show(20, truncate=False)
         )
-        .withColumn("prediction_time", current_timestamp())
-        .drop("rawPrediction", "probability", "probability_array", "features")
-    )
 
-    return result_df
-
-
-def write_prediction_to_console(result_df, trigger_seconds):
-    console_query = (
-        result_df
-        .select(
-            "prediction_time",
-            "prediction",
-            "prediction_label",
-            "good_loan_probability",
-            "bad_loan_probability"
+        (
+            batch_df
+            .write
+            .mode("append")
+            .parquet(OUTPUT_PATH)
         )
-        .writeStream
-        .outputMode("append")
-        .format("console")
-        .option("truncate", "false")
-        .trigger(processingTime=f"{trigger_seconds} seconds")
-        .start()
-    )
 
-    return console_query
+        print(f"\nBatch {batch_id} written to HDFS:")
+        print(OUTPUT_PATH)
+    else:
+        print("No records in this batch.")
 
 
-def write_prediction_to_hdfs(result_df, output_path, checkpoint_path, trigger_seconds):
-    hdfs_query = (
-        result_df
-        .writeStream
-        .outputMode("append")
-        .format("parquet")
-        .option("path", output_path)
-        .option("checkpointLocation", checkpoint_path)
-        .trigger(processingTime=f"{trigger_seconds} seconds")
-        .start()
-    )
-
-    return hdfs_query
+prediction_query = (
+    result_df
+    .writeStream
+    .foreachBatch(write_prediction_batch)
+    .outputMode("append")
+    .option("checkpointLocation", CHECKPOINT_PATH)
+    .trigger(processingTime=f"{TRIGGER_SECONDS} seconds")
+    .start()
+)
 
 
-def main():
-    args = parse_args()
+# ============================================================
+# 10. KEEP STREAMING JOB RUNNING
+# ============================================================
 
-    spark = create_spark_session()
+print("\n" + "=" * 88)
+print("STREAMING PREDICTION STARTED")
+print("=" * 88)
+print(f"Prediction output path: {OUTPUT_PATH}")
+print(f"Checkpoint path: {CHECKPOINT_PATH}")
+print()
+print("Now open a NEW terminal at the project root and run:")
+print(r"python src\09_kafka_producer.py --limit 10 --sleep 0.1")
+print()
+print("This cell will keep running. Interrupt this cell to stop streaming.")
+print("=" * 88)
 
-    input_schema = infer_input_schema(spark, args.sample_json_dir)
-
-    print("=" * 88)
-    print("LOAD BEST CLASSIFICATION MODEL")
-    print("=" * 88)
-    print(f"Model path: {args.model_path}")
-
-    model = PipelineModel.load(args.model_path)
-
-    kafka_df = read_kafka_stream(
-        spark=spark,
-        bootstrap_server=args.bootstrap_server,
-        topic=args.topic
-    )
-
-    stream_input_df = parse_kafka_json(kafka_df, input_schema)
-
-    prediction_df = model.transform(stream_input_df)
-
-    result_df = add_prediction_columns(prediction_df)
-
-    console_query = write_prediction_to_console(
-        result_df=result_df,
-        trigger_seconds=args.trigger_seconds
-    )
-
-    hdfs_query = write_prediction_to_hdfs(
-        result_df=result_df,
-        output_path=args.output_path,
-        checkpoint_path=args.checkpoint_path,
-        trigger_seconds=args.trigger_seconds
-    )
-
-    print("=" * 88)
-    print("STREAMING PREDICTION STARTED")
-    print("=" * 88)
-    print(f"Prediction output path: {args.output_path}")
-    print(f"Checkpoint path: {args.checkpoint_path}")
-    print("Press Ctrl + C to stop streaming.")
-
-    try:
-        hdfs_query.awaitTermination()
-    except KeyboardInterrupt:
-        print("Stopping streaming queries...")
-        console_query.stop()
-        hdfs_query.stop()
-        spark.stop()
-        print("Streaming stopped.")
-
-
-if __name__ == "__main__":
-    main()
+try:
+    prediction_query.awaitTermination()
+except KeyboardInterrupt:
+    print("Stopping streaming query...")
+    prediction_query.stop()
+    spark.stop()
+    print("Streaming stopped.")

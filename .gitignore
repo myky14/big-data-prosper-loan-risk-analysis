@@ -1,46 +1,149 @@
-# Python cache
+# ============================================================
+# Python cache / compiled files
+# ============================================================
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
 
-# IDE / editor
-.idea/
-.vscode/
 
+# ============================================================
 # Virtual environments
+# ============================================================
 env/
 venv/
-env_spark/
 .venv/
-.env
+.env/
+env_spark/
+ENV/
 
-# OS files
+
+# ============================================================
+# IDE / editor settings
+# ============================================================
+.idea/
+.vscode/
+*.code-workspace
+
+
+# ============================================================
+# OS generated files
+# ============================================================
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Logs / temp files
+
+# ============================================================
+# Logs / temporary / backup files
+# ============================================================
 *.log
 *.tmp
 *.bak
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Spark / Hadoop local runtime outputs
-checkpoints/
-spark-warehouse/
-metastore_db/
+*.swp
+*.swo
+~$*
 derby.log
 
+
+# ============================================================
+# Jupyter Notebook checkpoints
+# ============================================================
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+
+# ============================================================
+# Spark / Hadoop local runtime outputs
+# ============================================================
+spark-warehouse/
+metastore_db/
+checkpoints/
+streaming-checkpoints/
+warehouse/
+*.crc
+_SUCCESS
+
+
+# ============================================================
+# Kafka / ZooKeeper local runtime state
+# ============================================================
+kafka-logs/
+zookeeper-data/
+kraft-combined-logs/
+
+
+# ============================================================
 # Project generated outputs
+# ============================================================
 outputs/
 src/outputs/
 
-# Local processed/generated data
+
+# ============================================================
+# Local processed / generated data
+# ============================================================
 data/processed/*
 !data/processed/.gitkeep
 
-# Kafka / streaming generated state
-kafka-logs/
-zookeeper-data/
-streaming-checkpoints/
+data/temp/
+data/tmp/
+data/interim/
+
+
+# ============================================================
+# Large local data files
+# Keep raw dataset out of Git unless the team explicitly decides otherwise
+# ============================================================
+data/raw/*
+!data/raw/.gitkeep
+
+*.csv
+*.parquet
+*.json
+*.jsonl
+*.avro
+*.orc
+
+
+# ============================================================
+# Spark MLlib saved models / generated model artifacts
+# ============================================================
+models/
+data/models/
+src/models/
+
+
+# ============================================================
+# Report export / render cache
+# ============================================================
+rendered/
+docx_render/
+pdf_render/
+*.aux
+*.toc
+*.out
+
+
+# ============================================================
+# Archive / compressed files
+# ============================================================
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+
+# ============================================================
+# Environment / secrets
+# ============================================================
+.env
+.env.*
+*.env
+secrets/
+credentials/
+*.key
+*.pem
