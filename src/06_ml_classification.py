@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 FILE 06 - Classification Feature Selection + MLlib Modeling + Stream Data Split
 
 Flow:
 1. Read preprocessed classification data from HDFS.
 2. Split data 7:2:1 into train/test/stream simulation.
-3. Run classification feature selection on train data only.
+3. Run classification feature scoring/ranking on train data only.
    - Chi-square score after discretizing numeric features.
    - Random Forest feature importance.
    - Combined score = 0.5 * normalized chi-square + 0.5 * normalized RF importance.
@@ -30,7 +29,10 @@ from pyspark.sql.functions import col, count, lit, rand, when
 from pyspark.sql.types import BooleanType, NumericType, StringType
 
 SEED = 42
-TOP_N_FEATURES = 12
+
+# Feature selection is used for scoring/ranking only.
+# We keep all available features for model training to avoid losing information.
+KEEP_ALL_FEATURES_FOR_MODELING = True
 
 INPUT_PATH = (
     "hdfs://localhost:9000/bigdata/prosper_loan/processed/"
@@ -254,7 +256,7 @@ def plot_confusion_matrix(confusion, model_name):
 
 
 def classification_feature_selection(train_df, numeric_cols, categorical_cols):
-    print_header("CLASSIFICATION FEATURE SELECTION")
+    print_header("CLASSIFICATION FEATURE SCORING / RANKING")
     stages = []
     fs_cols = []
     for c in numeric_cols:
@@ -297,15 +299,23 @@ def classification_feature_selection(train_df, numeric_cols, categorical_cols):
             "combined_score": round(combined, 8),
         })
     rows = sorted(rows, key=lambda r: r["combined_score"], reverse=True)
+
+    # Feature selection is used as a diagnostic/ranking step.
+    # All ranked features are kept for model training.
+    selected = [r["feature"] for r in rows]
+
     for rank, row in enumerate(rows, start=1):
         row["rank"] = rank
-        row["selected"] = "YES" if rank <= TOP_N_FEATURES else "NO"
-    selected = [r["feature"] for r in rows[:TOP_N_FEATURES]]
+        row["selected"] = "YES"
+
     write_dicts_to_csv(rows, FEATURE_SCORE_CSV)
     plot_feature_scores(rows)
-    print("Selected features:")
+
+    print("Feature ranking completed.")
+    print("All ranked features are kept for model training:")
     for i, feature in enumerate(selected, start=1):
         print(f"{i:02d}. {feature}")
+
     return selected
 
 
@@ -438,8 +448,8 @@ def main():
 
     selected_features = classification_feature_selection(train_df, numeric_cols, categorical_cols)
     selected_numeric, selected_categorical = split_feature_types(selected_features, numeric_cols, categorical_cols)
-    print(f"Selected numeric features: {selected_numeric}")
-    print(f"Selected categorical features: {selected_categorical}")
+    print(f"Numeric features kept for training: {selected_numeric}")
+    print(f"Categorical features kept for training: {selected_categorical}")
 
     metric_rows, model_objects, prediction_objects = train_models(train_df, test_df, selected_numeric, selected_categorical)
     best_row = metric_rows[0]
