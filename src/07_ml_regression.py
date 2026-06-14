@@ -1,16 +1,32 @@
 """
-FILE 07 - Regression Feature Selection + MLlib Modeling
+FILE 07 - Regression Feature Selection + MLlib Modeling (BorrowerAPR pricing model)
+
+Goal of this file:
+    BorrowerAPR is the annual cost the platform charges a borrower. On Prosper,
+    this rate is not random: it is produced by a risk-based pricing rule
+    (roughly cost of funds + expected loss + target margin). Features such as
+    EstimatedLoss and ProsperScore are themselves outputs of Prosper's internal
+    risk grading and direct inputs to that pricing rule.
+
+    Therefore this regression is framed as RECONSTRUCTING / APPROXIMATING the
+    platform's pricing mechanism, not as discovering APR from scratch. A high R2
+    is expected and meaningful here: it shows we recovered the pricing function,
+    and the feature-importance output tells us WHICH risk signals drive the price.
+    We deliberately keep every ranked feature (see KEEP_ALL_FEATURES_FOR_MODELING)
+    because the objective is a faithful reconstruction of how APR is priced.
 
 Flow:
 1. Read preprocessed regression data from HDFS.
-2. Split train/test.
-3. Run regression feature scoring/ranking on train data only.
+2. Split train/test (8:2).
+3. Run regression feature scoring/ranking on train data only (diagnostic).
    - Pearson correlation for numeric features.
    - Random Forest Regressor feature importance.
    - Combined score = 0.5 * normalized correlation + 0.5 * normalized RF importance.
-4. Train Linear Regression, Random Forest Regressor, and GBTRegressor.
-5. Evaluate with RMSE, MAE, R2, and MAPE.
-6. Save best regression PipelineModel and report artifacts.
+4. Train Baseline Mean, Linear Regression, Random Forest Regressor, and GBTRegressor.
+5. Evaluate with RMSE, MAE, R2, and MAPE; Baseline Mean is the reference floor.
+6. Extract best-model feature importance to interpret the APR pricing drivers.
+7. Analyze prediction error by APR band to check reliability across the price range.
+8. Save best regression PipelineModel and report artifacts.
 """
 
 import csv
@@ -23,14 +39,12 @@ from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml.feature import Imputer, OneHotEncoder, StandardScaler, StringIndexer, VectorAssembler
 from pyspark.ml.regression import GBTRegressor, LinearRegression, RandomForestRegressor
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import abs as spark_abs, avg, col, count, max as spark_max, min as spark_min, rand, stddev
+from pyspark.sql.functions import abs as spark_abs, avg, col, count, max as spark_max, min as spark_min, rand, stddev, when
 from pyspark.sql.types import BooleanType, NumericType, StringType
 
 SEED = 42
 TRAIN_RATIO = 0.8
 
-# Feature selection is used for scoring/ranking only.
-# We keep all available features for regression modeling to avoid losing information.
 KEEP_ALL_FEATURES_FOR_MODELING = True
 TARGET_COL = "BorrowerAPR"
 
@@ -68,6 +82,8 @@ DATASET_SUMMARY_CSV = os.path.join(TABLE_DIR, "regression_dataset_summary.csv")
 FEATURE_SCORE_CSV = os.path.join(TABLE_DIR, "regression_feature_score.csv")
 MODEL_METRICS_CSV = os.path.join(TABLE_DIR, "model_metrics.csv")
 PREDICTION_SAMPLE_CSV = os.path.join(TABLE_DIR, "best_model_prediction_sample.csv")
+FEATURE_IMPORTANCE_CSV = os.path.join(TABLE_DIR, "best_model_feature_importance.csv")
+ERROR_BY_BAND_CSV = os.path.join(TABLE_DIR, "error_by_apr_band.csv")
 BEST_MODEL_INFO_TXT = os.path.join(TABLE_DIR, "best_model_info.txt")
 
 TARGET_DISTRIBUTION_FIG = os.path.join(FIGURE_DIR, "01_borrower_apr_distribution.png")
@@ -75,6 +91,7 @@ FEATURE_SCORE_FIG = os.path.join(FIGURE_DIR, "02_regression_feature_selection.pn
 MODEL_COMPARISON_FIG = os.path.join(FIGURE_DIR, "03_model_comparison.png")
 ACTUAL_VS_PREDICTED_FIG = os.path.join(FIGURE_DIR, "04_actual_vs_predicted_best_model.png")
 RESIDUAL_DISTRIBUTION_FIG = os.path.join(FIGURE_DIR, "05_residual_distribution_best_model.png")
+FEATURE_IMPORTANCE_FIG = os.path.join(FIGURE_DIR, "06_feature_importance_best_model.png")
 
 DROP_COLUMNS = {TARGET_COL, "features", "raw_features", "prediction"}
 
@@ -230,6 +247,23 @@ def plot_model_comparison(rows):
     plt.savefig(MODEL_COMPARISON_FIG, dpi=160, bbox_inches="tight")
     plt.close()
     print(f"Saved figure: {MODEL_COMPARISON_FIG}")
+
+
+def plot_feature_importance(rows):
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return
+    top_rows = rows[:15][::-1]
+    plt.figure(figsize=(10, 7))
+    plt.barh([r["feature"] for r in top_rows], [r["importance_pct"] for r in top_rows])
+    plt.title("BorrowerAPR Pricing Drivers (Best Model Feature Importance)")
+    plt.xlabel("Importance (%)")
+    plt.ylabel("Feature")
+    plt.tight_layout()
+    plt.savefig(FEATURE_IMPORTANCE_FIG, dpi=160, bbox_inches="tight")
+    plt.close()
+    print(f"Saved figure: {FEATURE_IMPORTANCE_FIG}")
 
 
 def sample_predictions(predictions, sample_size=5000):
@@ -418,6 +452,119 @@ def train_regression_models(train_df, test_df, numeric_cols, categorical_cols):
     return metric_rows, models, predictions
 
 
+def _map_assembled_name(name, numeric_cols, categorical_cols):
+    """Map an assembled feature-vector attribute name back to its source column."""
+    for c in numeric_cols:
+        if name == f"{c}__imputed":
+            return c
+    for c in categorical_cols:
+        if name.startswith(f"{c}__ohe"):
+            return c
+    for c in numeric_cols:
+        if name == c:
+            return c
+    for c in categorical_cols:
+        if name == c or name.startswith(c):
+            return c
+    return None
+
+
+def extract_feature_importance(best_name, best_model, best_predictions, numeric_cols, categorical_cols):
+    """Aggregate best-model importances back to original features.
+
+    For tree models (Random Forest / GBT) we use featureImportances. The vector
+    produced by VectorAssembler expands one-hot columns into several slots, so we
+    read the feature column metadata and sum the slot importances back onto the
+    original categorical / numeric feature. The result reads as a ranking of the
+    risk signals that drive the BorrowerAPR price.
+    """
+    print_header("BEST MODEL FEATURE IMPORTANCE (APR PRICING DRIVERS)")
+    last_stage = best_model.stages[-1]
+    if hasattr(last_stage, "featureImportances"):
+        raw = [safe_float(x) for x in last_stage.featureImportances.toArray()]
+    elif hasattr(last_stage, "coefficients"):
+        raw = [abs(safe_float(x)) for x in last_stage.coefficients.toArray()]
+    else:
+        print("Best model does not expose feature importance; skipping.")
+        return []
+
+    try:
+        attrs = best_predictions.schema["features"].metadata["ml_attr"]["attrs"]
+    except Exception:
+        attrs = {}
+    idx_to_name = {}
+    for group in attrs.values():
+        for attr in group:
+            idx_to_name[attr["idx"]] = attr["name"]
+
+    source = {f: 0.0 for f in (numeric_cols + categorical_cols)}
+    matched = False
+    for idx, importance in enumerate(raw):
+        name = idx_to_name.get(idx)
+        if name is None:
+            continue
+        src = _map_assembled_name(name, numeric_cols, categorical_cols)
+        if src is not None:
+            source[src] += importance
+            matched = True
+
+    if not matched:
+        print("Could not map feature importances back to source columns; skipping.")
+        return []
+
+    total = sum(source.values()) or 1.0
+    rows = []
+    for feature, value in source.items():
+        rows.append({
+            "feature": feature,
+            "feature_type": "numeric" if feature in numeric_cols else "categorical",
+            "importance": round(value, 8),
+            "importance_pct": round(100.0 * value / total, 4),
+        })
+    rows = sorted(rows, key=lambda r: r["importance"], reverse=True)
+    for rank, row in enumerate(rows, start=1):
+        row["rank"] = rank
+
+    write_dicts_to_csv(rows, FEATURE_IMPORTANCE_CSV)
+    plot_feature_importance(rows)
+
+    print(f"Top BorrowerAPR pricing drivers ({best_name}):")
+    for row in rows[:8]:
+        print(f"  {row['rank']:02d}. {row['feature']}: {row['importance_pct']:.2f}%")
+    return rows
+
+
+def error_by_apr_band(predictions):
+    """Check how reliable the model is across the APR range, not just on average."""
+    print_header("ERROR ANALYSIS BY APR BAND")
+    band_col = (
+        when(col(TARGET_COL) < 0.10, "1) [0.00, 0.10)")
+        .when(col(TARGET_COL) < 0.20, "2) [0.10, 0.20)")
+        .when(col(TARGET_COL) < 0.30, "3) [0.20, 0.30)")
+        .when(col(TARGET_COL) < 0.40, "4) [0.30, 0.40)")
+        .otherwise("5) [0.40, +inf)")
+    )
+    enriched = predictions.withColumn("apr_band", band_col)
+    agg_rows = enriched.groupBy("apr_band").agg(
+        count("*").alias("n"),
+        avg(spark_abs(col(TARGET_COL) - col("prediction"))).alias("mae"),
+        avg(spark_abs((col(TARGET_COL) - col("prediction")) / col(TARGET_COL))).alias("mape"),
+    ).orderBy("apr_band").collect()
+
+    rows = []
+    for r in agg_rows:
+        rows.append({
+            "apr_band": r["apr_band"],
+            "n": int(r["n"]),
+            "mae": round(safe_float(r["mae"]), 6),
+            "mape": round(safe_float(r["mape"]), 6),
+        })
+    write_dicts_to_csv(rows, ERROR_BY_BAND_CSV)
+    for r in rows:
+        print(f"  {r['apr_band']}: n={r['n']}, MAE={r['mae']}, MAPE={r['mape']}")
+    return rows
+
+
 def save_prediction_sample(predictions):
     rows = []
     sample = predictions.select(
@@ -466,6 +613,7 @@ def main():
     print(f"Numeric feature candidates: {len(numeric_cols)}")
     print(f"Categorical feature candidates: {len(categorical_cols)}")
     print("BorrowerAPR is excluded from features because it is the regression target.")
+    print("All other ranked features are kept on purpose to reconstruct the pricing rule.")
 
     train_df, test_df = train_test_split(df)
     selected_features = regression_feature_selection(train_df, numeric_cols, categorical_cols)
@@ -490,6 +638,12 @@ def main():
     plot_actual_vs_predicted(best_predictions)
     plot_residual_distribution(best_predictions)
     save_prediction_sample(best_predictions)
+
+    # Interpretation step: which risk signals drive the APR price, and where the
+    # model is most / least reliable across the APR range.
+    extract_feature_importance(best_name, best_model, best_predictions, selected_numeric, selected_categorical)
+    error_by_apr_band(best_predictions)
+
     spark.stop()
 
 
