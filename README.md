@@ -295,9 +295,9 @@ Suggested screenshots:
 | Label 1 | Chargedoff, Defaulted = Bad Loan |
 | Excluded statuses | Current and other unfinished statuses |
 | Models | Logistic Regression, Random Forest Classifier, Gradient Boosted Trees Classifier |
-| Metrics | [TODO: Insert Accuracy, Precision, Recall, F1-score] |
+| Metrics | <img width="1469" height="335" alt="Screenshot 2026-06-15 232540" src="https://github.com/user-attachments/assets/cfdc9d4b-5918-4786-b91c-ab97ad654fa0" /> |
 
-[![Confusion Matrix](<Screenshot 2026-06-15 232725.png>)]
+![Confusion Matrix](<Screenshot 2026-06-15 232725.png>)
 
 ### Regression
 
@@ -306,14 +306,14 @@ Suggested screenshots:
 | Objective | Predict BorrowerAPR |
 | Target | BorrowerAPR |
 | Models | Linear Regression, Random Forest Regressor, Gradient Boosted Trees Regressor |
-| Metrics | [TODO: Insert RMSE, MAE, R2] |
+| Metrics | <img width="1028" height="259" alt="Screenshot 2026-06-15 233026 - Copy" src="https://github.com/user-attachments/assets/78f60f78-687c-40c8-a6c4-24954b69c42a" /> |
 
 ### Model Comparison
 
 | Task | Models evaluated | Result summary |
 | --- | --- | --- |
-| Classification | Logistic Regression, Random Forest Classifier, Gradient Boosted Trees Classifier | [TODO: Insert verified best model and metrics] |
-| Regression | Linear Regression, Random Forest Regressor, Gradient Boosted Trees Regressor | [TODO: Insert verified best model and metrics] |
+| Classification | Logistic Regression, Random Forest Classifier, Gradient Boosted Trees Classifier | GBTClassifier - Accuracy: 0.6755 - F1 Score: 0.6876 - ROC-AUC: 0.7496 - PR-AUC: 0.5591 |
+| Regression | Linear Regression, Random Forest Regressor, Gradient Boosted Trees Regressor | GBTRegressor - RMSE: 0.0258 - MAE: 0.0146 - R²: 0.8970 - MAPE: 0.0797 |
 
 ### Important Findings
 
